@@ -104,7 +104,7 @@ namespace Raven.Server.Documents.Indexes.Persistence.Lucene.Documents
                 float? propertyBoost;
                 int numberOfCreatedFields = 0;
                 JsValue actualValue;
-                
+
                 if (isDynamicFieldEnumerable)
                 {
                     do
@@ -196,7 +196,7 @@ namespace Raven.Server.Documents.Indexes.Persistence.Lucene.Documents
                             if (inner.IsString())
                             {
                                 spatialField = AbstractStaticIndexBase.GetOrCreateSpatialField(field.Name);
-                                spatial = AbstractStaticIndexBase.CreateSpatialField(spatialField, inner.AsString());
+                                spatial = (IEnumerable<AbstractField>)AbstractStaticIndexBase.CreateSpatialField(spatialField, inner.AsString());
                             }
                             else if (inner.IsObject())
                             {
@@ -205,7 +205,7 @@ namespace Raven.Server.Documents.Indexes.Persistence.Lucene.Documents
                                     && lat.IsNumber() && innerObject.TryGetValue("Lng", out var lng) && lng.IsNumber())
                                 {
                                     spatialField = AbstractStaticIndexBase.GetOrCreateSpatialField(field.Name);
-                                    spatial = AbstractStaticIndexBase.CreateSpatialField(spatialField, lat.AsNumber(), lng.AsNumber());
+                                    spatial = (IEnumerable<AbstractField>)AbstractStaticIndexBase.CreateSpatialField(spatialField, lat.AsNumber(), lng.AsNumber());
                                 }
                                 else
                                 {
@@ -240,7 +240,7 @@ namespace Raven.Server.Documents.Indexes.Persistence.Lucene.Documents
                     context: indexContext);
                 return GetRegularFields(instance, field, CreateValueForIndexing(value, propertyBoost), indexContext, sourceDocument, out _);
             }
-            
+
             bool IsDynamicFieldEnumerable(JsValue propertyDescriptorValue, string propertyAsString, IndexField field, out IEnumerator<JsValue> iterator)
             {
                 iterator = Enumerable.Empty<JsValue>().GetEnumerator();
@@ -256,8 +256,8 @@ namespace Raven.Server.Documents.Indexes.Persistence.Lucene.Documents
 
                 return TryDetectDynamicFieldCreation(propertyAsString, valueAsObject, field) is not null
                        || valueAsObject.HasOwnProperty(SpatialPropertyName);
-            }
-            
+                }
+
             static bool IsObject(JsValue value)
             {
                 return value.IsObject() && value.IsArray() == false;
@@ -284,7 +284,7 @@ namespace Raven.Server.Documents.Indexes.Persistence.Lucene.Documents
                 }
             }
         }
-        
+
         private static bool TryGetBoostedValue(ObjectInstance valueToCheck, out JsValue value, out float? boost)
         {
             value = JsValue.Undefined;

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Raven.Client.Documents.Indexes;
 using Raven.Client.Exceptions;
 using Raven.Server.Documents.Includes;
 using Raven.Server.Documents.Patch;
@@ -25,6 +26,7 @@ namespace Raven.Server.Documents.Queries
     {
         private readonly DocumentDatabase _database;
         private readonly DocumentsStorage _documents;
+        private readonly SearchEngineType _searchEngineType;
         private readonly FieldsToFetch _fieldsToFetch;
         private readonly DocumentsOperationContext _context;
         private readonly IncludeDocumentsCommand _includeDocumentsCommand;
@@ -38,13 +40,14 @@ namespace Raven.Server.Documents.Queries
         private readonly QueryTimingsScope _queryTimings;
         private readonly bool _isAllDocsCollection;
 
-        public CollectionQueryEnumerable(DocumentDatabase database, DocumentsStorage documents, FieldsToFetch fieldsToFetch, string collection,
+        public CollectionQueryEnumerable(DocumentDatabase database, DocumentsStorage documents, SearchEngineType searchEngineType, FieldsToFetch fieldsToFetch, string collection,
             IndexQueryServerSide query, QueryTimingsScope queryTimings, DocumentsOperationContext context, IncludeDocumentsCommand includeDocumentsCommand,
             IncludeRevisionsCommand includeRevisionsCommand, IncludeCompareExchangeValuesCommand includeCompareExchangeValuesCommand, Reference<int> totalResults,
             Reference<int> scannedResults, Reference<long> skippedResults, CancellationToken token)
         {
             _database = database;
             _documents = documents;
+            _searchEngineType = searchEngineType;
             _fieldsToFetch = fieldsToFetch;
             _collection = collection;
             _isAllDocsCollection = collection == Constants.Documents.Collections.AllDocumentsCollection;
@@ -68,7 +71,7 @@ namespace Raven.Server.Documents.Queries
 
         public IEnumerator<Document> GetEnumerator()
         {
-            return new Enumerator(_database, _documents, _fieldsToFetch, _collection, _isAllDocsCollection, _query,
+            return new Enumerator(_database, _documents, SearchEngineType.None, _fieldsToFetch, _collection, _isAllDocsCollection, _query,
                 _queryTimings, _context, _includeDocumentsCommand, _includeRevisionsCommand, _includeCompareExchangeValuesCommand, _totalResults, _scannedResults, 
                 StartAfterId, AlreadySeenIdsCount, Fields, _skippedResults, _token);
         }
@@ -125,6 +128,7 @@ namespace Raven.Server.Documents.Queries
             private readonly string _startAfterId;
             private readonly Reference<long> _alreadySeenIdsCount;
             private readonly DocumentFields _fields;
+            private readonly SearchEngineType _searchEngineType;
 
             private bool _initialized;
 
@@ -144,12 +148,13 @@ namespace Raven.Server.Documents.Queries
             private readonly ScriptRunner.SingleRun _filterScriptRun;
             private ScriptRunner.ReturnRun _releaseFilterScriptRunner;
 
-            public Enumerator(DocumentDatabase database, DocumentsStorage documents, FieldsToFetch fieldsToFetch, string collection, bool isAllDocsCollection,
+            public Enumerator(DocumentDatabase database, DocumentsStorage documents, SearchEngineType searchEngineType, FieldsToFetch fieldsToFetch, string collection, bool isAllDocsCollection,
                 IndexQueryServerSide query, QueryTimingsScope queryTimings, DocumentsOperationContext context, IncludeDocumentsCommand includeDocumentsCommand,
                 IncludeRevisionsCommand includeRevisionsCommand,IncludeCompareExchangeValuesCommand includeCompareExchangeValuesCommand, Reference<int> totalResults, 
                 Reference<int> scannedResults, string startAfterId, Reference<long> alreadySeenIdsCount, DocumentFields fields, Reference<long> skippedResults, CancellationToken token)
             {
                 _documents = documents;
+                _searchEngineType = searchEngineType;
                 _fieldsToFetch = fieldsToFetch;
                 _collection = collection;
                 _isAllDocsCollection = isAllDocsCollection;
@@ -168,7 +173,7 @@ namespace Raven.Server.Documents.Queries
                 if (_fieldsToFetch.IsDistinct)
                     _alreadySeenProjections = new HashSet<ulong>();
 
-                _resultsRetriever = new MapQueryResultRetriever(database, query, queryTimings, documents, context, fieldsToFetch, includeDocumentsCommand, includeCompareExchangeValuesCommand, includeRevisionsCommand);
+                _resultsRetriever = new MapQueryResultRetriever(database, query, queryTimings, documents, context, searchEngineType, fieldsToFetch, includeDocumentsCommand, includeCompareExchangeValuesCommand, includeRevisionsCommand);
 
                 (_ids, _startsWith) = ExtractIdsFromQuery(query, context);
                 
@@ -259,7 +264,7 @@ namespace Raven.Server.Documents.Queries
                     _hasProjections = false;
                     _projections = default;
                 }
-                
+
                 if (_inner == null)
                 {
                     _inner = GetDocuments().GetEnumerator();
@@ -299,9 +304,11 @@ namespace Raven.Server.Documents.Queries
                     }
                 }
                 
+                RetrieverInput retrieverInput = new(null, QueryResultRetrieverBase.ZeroScore, null);
+
                 if (_fieldsToFetch.IsProjection)
                 {
-                    var result = _resultsRetriever.GetProjectionFromDocument(_inner.Current, null, QueryResultRetrieverBase.ZeroScore, _fieldsToFetch, _context, null, _token);
+                    var result = _resultsRetriever.GetProjectionFromDocument(_inner.Current, ref retrieverInput, _fieldsToFetch, _context, _token);
                     if (result.List != null)
                     {
                         var it = result.List.GetEnumerator();
@@ -337,7 +344,7 @@ namespace Raven.Server.Documents.Queries
                         countQuery = true;
                         _query.PageSize = int.MaxValue;
                     }
-                    
+
                     documents = _isAllDocsCollection
                         ? _documents.GetDocumentsStartingWith(_context, _startsWith, null, null, _startAfterId, _start, _query.PageSize, null, fields: _fields, _token) 
                         : _documents.GetDocumentsStartingWith(_context, _startsWith, _startAfterId, _start, _query.PageSize, _collection, _skippedResults,  _fields, _token);
@@ -420,10 +427,10 @@ namespace Raven.Server.Documents.Queries
                     foreach (var document in _documents.GetDocumentsFrom(_context, _collection, 0, start, _query.PageSize))
                     {
                         count++;
-
+                        RetrieverInput retrieverInput = new(null, QueryResultRetrieverBase.ZeroScore, null);
                         if (_fieldsToFetch.IsProjection)
                         {
-                            var result = _resultsRetriever.GetProjectionFromDocument(document, null, QueryResultRetrieverBase.ZeroScore, _fieldsToFetch, _context, null, _token);
+                            var result = _resultsRetriever.GetProjectionFromDocument(document, ref retrieverInput, _fieldsToFetch, _context, _token);
                             if (result.Document != null)
                             {
                                 if (IsStartingPoint(result.Document))
@@ -527,7 +534,7 @@ namespace Raven.Server.Documents.Queries
                             case MethodType.Id:
                                 if (value is ValueExpression ve)
                                 {
-                                    var id = QueryBuilder.GetValue(_query, _metadata, parameters, ve);
+                                    var id = QueryBuilderHelper.GetValue(_query, _metadata, parameters, ve);
 
                                     Debug.Assert(id.Type == ValueTokenType.String || id.Type == ValueTokenType.Null);
 
@@ -535,7 +542,7 @@ namespace Raven.Server.Documents.Queries
                                 }
                                 if (value is MethodExpression right)
                                 {
-                                    var id = QueryBuilder.EvaluateMethod(_query, _metadata, _serverContext, _context, right, ref parameters);
+                                    var id = LuceneQueryBuilder.EvaluateMethod(_query, _metadata, _serverContext, _context, right, ref parameters);
                                     if (id is ValueExpression v)
                                         AddId(v.Token.Value);
                                 }
@@ -564,7 +571,7 @@ namespace Raven.Server.Documents.Queries
                         {
                             if (item is ValueExpression iv)
                             {
-                                foreach (var id in QueryBuilder.GetValues(_query, _metadata, parameters, iv))
+                                foreach (var id in QueryBuilderHelper.GetValues(_query, _metadata, parameters, iv))
                                 {
                                     AddId(id.Value?.ToString());
                                 }
@@ -593,7 +600,7 @@ namespace Raven.Server.Documents.Queries
                     {
                         if (expression is ValueExpression iv)
                         {
-                            var prefix = QueryBuilder.GetValue(_query, _metadata, parameters, iv);
+                            var prefix = QueryBuilderHelper.GetValue(_query, _metadata, parameters, iv);
                             StartsWith = prefix.Value?.ToString();
                         }
                     }

@@ -10,6 +10,7 @@ using Raven.Client.Documents.Queries;
 using Raven.Client.Documents.Session;
 using Raven.Tests.Core.Utils.Entities;
 using Sparrow;
+using Tests.Infrastructure;
 using Tests.Infrastructure.Entities;
 using Xunit;
 using Xunit.Abstractions;
@@ -1957,10 +1958,11 @@ namespace SlowTests.Client.TimeSeries.Session
             }
         }
 
-        [Fact]
-        public void CanFilterByCmpXchgAndIncludeTimeSeriesAndCounters()
+        [RavenTheory(RavenTestCategory.TimeSeries)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Lucene)]
+        public void CanFilterByCmpXchgAndIncludeTimeSeriesAndCounters(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 var baseline = RavenTestHelper.UtcToday;
 

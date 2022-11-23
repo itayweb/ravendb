@@ -1,5 +1,5 @@
 <div class="destinations flex-vertical absolute-fill content-margin manage-ongoing-tasks">
-    <div class="row flex-row flex-grow flex-stretch-items">
+    <div class="row flex-grow flex-stretch-items">
         <div class="col-sm-12 col-lg-6 flex-vertical">
             <div class="flex-header flex-horizontal">
                 <div>
@@ -29,14 +29,14 @@
                 <div>
                     <div class="btn-group" data-bind="visible: existingTaskTypes().length > 1">
                         <button type="button" class="btn btn-sm btn-default dropdown-toggle" data-toggle="dropdown" title="Filter by task type">
-                            <span data-bind="text: selectedTaskType"></span>&nbsp;&nbsp;
+                            <span data-bind="text: $root.getTaskNameForUI(selectedTaskType())"></span>&nbsp;&nbsp;
                             <span class="caret"></span>
                             <span class="sr-only">Toggle Dropdown</span>
                         </button>
                         <ul class="dropdown-menu" role="menu">
                             <!-- ko foreach: existingTaskTypes() -->
                             <li class="flex-horizontal">
-                                <a class="flex-grow" href="#" data-bind="text: $data, click: $root.setSelectedTaskType.bind($root, $data)"></a>
+                                <a class="flex-grow" href="#" data-bind="text: $root.getTaskNameForUI($data), click: $root.setSelectedTaskType.bind($root, $data)"></a>
                                 <span class="badge margin-right margin-right-sm" data-bind="text: $root.taskNameToCount()[$data]"></span>
                             </li>
                             <!-- /ko -->
@@ -330,6 +330,94 @@
                                                 <div class="property-value" data-bind="text: $data" title="Node Url"></div>
                                             </div>
                                             <!-- /ko -->
+                                        </div>
+                                        <div data-bind="template: { name: 'etl-progress-template' }"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kafka Etl -->
+
+                <div data-bind="if: showKafkaSection">
+                    <div class="hr-title">
+                        <h5 class="tasks-list-item kafka-etl no-text-transform">
+                            <i class="icon-kafka-etl"></i>
+                            <span>Kafka ETL</span><span data-bind="text: ' (' + kafkaEtlTasks().length + ')'"></span>
+                        </h5><hr>
+                    </div>
+                    <div data-bind="foreach: kafkaEtlTasks">
+                        <div class="panel destination-item kafka-etl" data-bind="if: responsibleNode().NodeTag === $parent.selectedNode() || $parent.selectedNode() === 'All nodes'">
+                            <div data-bind="attr: { 'data-state-text': badgeText, class: 'state ' + badgeClass() }"></div>
+                            <div class="padding destination-info flex-vertical">
+                                <div class="flex-horizontal">
+                                    <div class="checkbox panel-checkbox hide">
+                                        <input type="checkbox" class="styled" />
+                                        <label></label>
+                                    </div>
+                                    <div class="panel-name flex-grow" data-bind="template: { name: 'name-template-admin' }"></div>
+                                    <div class="node" data-bind="template: { name: 'responsible-node-template' }"></div>
+                                    <div class="status" data-bind="template: { name: 'state-template' }"></div>
+                                    <div data-bind="template: { name: 'actions-template-admin' }"></div>
+                                </div>
+                            </div>
+                            <div class="collapse panel-addon" data-bind="collapse: showDetails">
+                                <div class="padding flex-horizontal">
+                                    <div class="flex-grow">
+                                        <div class="list-properties">
+                                            <div class="property-item">
+                                                <div class="property-name">Task Status:</div>
+                                                <div class="property-value text-details" data-bind="text: badgeText"></div>
+                                            </div>
+                                            <div class="property-item" data-bind="template: { name: 'connection-string-template' }"></div>
+                                            <div class="property-item" data-bind="visible: connectionStringDefined">
+                                                <div class="property-name">Bootstrap Servers:</div>
+                                                <div class="property-value" data-bind="text: bootstrapServers" title="Kafka bootstrap servers"></div>
+                                            </div>
+                                        </div>
+                                        <div data-bind="template: { name: 'etl-progress-template' }"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RabbitMq Etl -->
+
+                <div data-bind="if: showRabbitMqSection">
+                    <div class="hr-title">
+                        <h5 class="tasks-list-item rabbitmq-etl no-text-transform">
+                            <i class="icon-rabbitmq-etl"></i>
+                            <span>RabbitMQ ETL</span><span data-bind="text: ' (' + rabbitMqEtlTasks().length + ')'"></span>
+                        </h5><hr>
+                    </div>
+                    <div data-bind="foreach: rabbitMqEtlTasks">
+                        <div class="panel destination-item rabbitmq-etl" data-bind="if: responsibleNode().NodeTag === $parent.selectedNode() || $parent.selectedNode() === 'All nodes'">
+                            <div data-bind="attr: { 'data-state-text': badgeText, class: 'state ' + badgeClass() }"></div>
+                            <div class="padding destination-info flex-vertical">
+                                <div class="flex-horizontal">
+                                    <div class="checkbox panel-checkbox hide">
+                                        <input type="checkbox" class="styled" />
+                                        <label></label>
+                                    </div>
+                                    <div class="panel-name flex-grow" data-bind="template: { name: 'name-template-admin' }"></div>
+                                    <div class="node" data-bind="template: { name: 'responsible-node-template' }"></div>
+                                    <div class="status" data-bind="template: { name: 'state-template' }"></div>
+                                    <div data-bind="template: { name: 'actions-template-admin' }"></div>
+                                </div>
+                            </div>
+                            <div class="collapse panel-addon" data-bind="collapse: showDetails">
+                                <div class="padding flex-horizontal">
+                                    <div class="flex-grow">
+                                        <div class="list-properties">
+                                            <div class="property-item">
+                                                <div class="property-name">Task Status:</div>
+                                                <div class="property-value text-details" data-bind="text: badgeText"></div>
+                                            </div>
+                                            <div class="property-item" data-bind="template: { name: 'connection-string-template' }"></div>
                                         </div>
                                         <div data-bind="template: { name: 'etl-progress-template' }"></div>
                                     </div>
@@ -659,7 +747,7 @@
             </div>
         </div>
 
-        <div class="col-sm-12 col-lg-6 flex-vertical">
+        <div class="col-sm-12 col-lg-6 flex-vertical database-group-topology">
             <div class="flex-horizontal flex-header">
                 <h3 class="on-base-background">Database Group Topology</h3>
                 <div class="flex-separator"></div>
@@ -678,7 +766,7 @@
                     </ul>
                 </div>-->
             </div>
-            <div class="panel flex-grow" id="databaseGroupGraphContainer">
+            <div class="panel" id="databaseGroupGraphContainer">
                 <h3>Database Group Topology</h3>
                 <button class="btn btn-default exit-button" data-bind="click: graph.exitFullScreen">
                     <i class="icon-exit-fullscreen"></i>
@@ -780,7 +868,7 @@
                     <span data-bind="text: name"></span>
                     <a title="Show script preview" href="#" data-bind="click: _.partial($root.showItemPreview, $parent, name())"><i class="icon-preview margin-left margin-left-xs"></i></a>
                     <div class="flex-separator"></div>
-                    <div class="text-warning" data-bind="visible: !globalProgress.total()">
+                    <div class="text-warning" data-bind="visible: !globalProgress.total() && $parent.taskType() !== 'QueueEtl'">
                         <small>
                             <i class="icon-warning"></i>
                             This script doesn't match any documents.
@@ -825,7 +913,7 @@
 <script type="text/html" id="connection-string-template">
     <div class="property-name">Connection String:</div>
     <div class="property-value" data-bind="visible: connectionStringDefined">
-        <div title="Connection string name" data-bind="visible: $root.isAdminAccessOrAbove">
+        <div title="Click to view connection string" data-bind="visible: $root.isAdminAccessOrAbove">
             <a target="_blank" data-bind="attr: { href: connectionStringsUrl }, text: connectionStringName"></a>
         </div>
         <div title="Connection string name" data-bind="visible: !$root.isAdminAccessOrAbove()">

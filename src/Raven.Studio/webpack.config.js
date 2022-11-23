@@ -114,6 +114,10 @@ module.exports = (env, args) => {
         module: {
             rules: [
                 {
+                    resourceQuery: /raw/,
+                    type: 'asset/source',
+                },
+                {
                     test: /\.font\.js$/,
                     use: [
                         MiniCssExtractPlugin.loader,
@@ -166,7 +170,9 @@ module.exports = (env, args) => {
                                     "cluster-member": 0xf125,
                                     "cluster-promotable": 0xf126,
                                     "cluster-watcher": 0xf127,
-                                    "arrow-up": 0xf128
+                                    "arrow-up": 0xf128,
+                                    "kafka-etl": 0xf129,
+                                    "rabbitmq-etl": 0xf130
                                 },
                                 cssTemplate: path.resolve(__dirname, "wwwroot/Content/css/fonts/icomoon.template.css.hbs")
                             }
@@ -265,6 +271,7 @@ module.exports = (env, args) => {
                 configuration: path.resolve(__dirname, 'typings/server/configuration'),
                 
                 Content: path.resolve(__dirname, 'wwwroot/Content/'),
+                wwwroot: path.resolve(__dirname, 'wwwroot/'),
                 d3: path.resolve(__dirname, 'wwwroot/Content/custom_d3'),
                 qrcodejs: path.resolve(__dirname, 'wwwroot/Content/custom_qrcode'),
                 ["google.analytics"]: path.resolve(__dirname, 'wwwroot/Content/custom_ga'),

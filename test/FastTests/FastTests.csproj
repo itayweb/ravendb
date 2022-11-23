@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <RuntimeFrameworkVersion>6.0.11</RuntimeFrameworkVersion>
+    <TargetFramework>net7.0</TargetFramework>
+    <RuntimeFrameworkVersion>7.0.0</RuntimeFrameworkVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>FastTests</AssemblyName>
     <PackageId>FastTests</PackageId>
@@ -21,6 +21,21 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Blittable\BlittableJsonWriterTests\Jsons\*.json" />
+    <None Remove="Corax\Bugs\Corax.Set.Adds.txt" />
+    <EmbeddedResource Include="Corax\Bugs\Corax.Set.Adds.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <None Remove="Corax\Bugs\Corax.Set.Removals.txt" />
+    <EmbeddedResource Include="Corax\Bugs\Corax.Set.Removals.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <None Remove="Corax\Bugs\Terms.log.gz" />
+    <None Remove="Corax\Bugs\repro-2.log.gz" />
+    <None Remove="Corax\Bugs\Terms-2.txt.gz" />
+    <EmbeddedResource Include="Corax\Bugs\Terms-2.txt.gz" />
+    <None Remove="Corax\Bugs\3-2015-10.txt.gz" />
+    <EmbeddedResource Include="Corax\Bugs\3-2015-10.txt.gz" />
+    <None Remove="Corax\Bugs\repro-4.log.gz" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="Sparrow\BitVectors.cs" />
@@ -34,6 +49,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Corax\Corax.csproj" />
     <ProjectReference Include="..\..\src\Raven.Client\Raven.Client.csproj" />
     <ProjectReference Include="..\..\src\Raven.Server\Raven.Server.csproj" />
     <ProjectReference Include="..\..\src\Sparrow\Sparrow.csproj" />
@@ -44,6 +60,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.0" />
     <PackageReference Include="NodaTime" Version="3.1.5" />
+    <PackageReference Include="Spatial4n" Version="0.4.1.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

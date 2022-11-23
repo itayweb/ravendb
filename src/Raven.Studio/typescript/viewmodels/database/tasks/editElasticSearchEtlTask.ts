@@ -24,6 +24,7 @@ import getDocumentsMetadataByIDPrefixCommand = require("commands/database/docume
 import getDocumentWithMetadataCommand = require("commands/database/documents/getDocumentWithMetadataCommand");
 import testElasticSearchEtlCommand = require("commands/database/tasks/testElasticSearchEtlCommand");
 import ongoingTaskElasticSearchTransformationModel = require("models/database/tasks/ongoingTaskElasticSearchEtlTransformationModel");
+import discoveryUrl = require("models/database/settings/discoveryUrl");
 import { highlight, languages } from "prismjs";
 
 class elasticSearchTaskTestMode {
@@ -134,7 +135,7 @@ class elasticSearchTaskTestMode {
                 Configuration: this.configurationProvider()
             };
 
-            eventsCollector.default.reportEvent("elastic-search-etl", "test-replication");
+            eventsCollector.default.reportEvent("elastic-search-etl", "test-script");
 
             new testElasticSearchEtlCommand(this.db(), dto)
                 .execute()
@@ -210,6 +211,7 @@ class editElasticSearchEtlTask extends viewModelBase {
     constructor() {
         super();
         this.bindToCurrentInstance("useConnectionString",
+            "onTestConnectionElasticSearch",
             "removeTransformationScript",
             "cancelEditedTransformation",
             "cancelEditedElasticSearchIndex",
@@ -392,6 +394,21 @@ class editElasticSearchEtlTask extends viewModelBase {
     
     useConnectionString(connectionStringToUse: string) {
         this.editedElasticSearchEtl().connectionStringName(connectionStringToUse);
+    }
+
+    onTestConnectionElasticSearch(urlToTest: discoveryUrl) {
+        eventsCollector.default.reportEvent("elastic-search-connection-string", "test-connection");
+        this.spinners.test(true);
+        this.testConnectionResult(null);
+        this.newConnectionString().selectedUrlToTest(urlToTest.discoveryUrlName());
+
+        this.newConnectionString()
+            .testConnection(this.activeDatabase(), urlToTest)
+            .done(result => this.testConnectionResult(result))
+            .always(() => {
+                this.spinners.test(false);
+                this.fullErrorDetailsVisible(false);
+            });
     }
 
     saveElasticSearchEtl() {
@@ -593,7 +610,7 @@ class editElasticSearchEtlTask extends viewModelBase {
     }
     
     private makeSureSandboxIsVisible() {
-        const $editArea = $(".edit-raven-sql-task");
+        const $editArea = $(".edit-elastic-search-task");
         if ($editArea.scrollTop() > 300) {
             $editArea.scrollTop(0);
         }

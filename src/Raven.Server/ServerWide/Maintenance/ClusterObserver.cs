@@ -1376,6 +1376,30 @@ namespace Raven.Server.ServerWide.Maintenance
                 return (false, null);
             }
 
+            using (_contextPool.AllocateOperationContext(out TransactionOperationContext context))
+            using (context.OpenReadTransaction())
+            {
+                var leaderLastCompareExchangeIndex = _server.Cluster.GetLastCompareExchangeIndexForDatabase(context, dbName);
+                var promotableLastCompareExchangeIndex = promotableDbStats.LastCompareExchangeIndex;
+                if (leaderLastCompareExchangeIndex > promotableLastCompareExchangeIndex)
+                {
+                    var msg = $"The database '{dbName}' on {promotable} not ready to be promoted, because not all of the compare exchanges have been sent yet." + Environment.NewLine +
+                              $"Last Compare Exchange Raft Index: {promotableLastCompareExchangeIndex}" + Environment.NewLine +
+                              $"Leader's Compare Exchange Raft Index: {leaderLastCompareExchangeIndex}";
+
+                    LogMessage($"Node {promotable} hasn't been promoted because it's raft index isn't updated yet", database: dbName);
+
+                    if (topology.DemotionReasons.TryGetValue(promotable, out var demotionReason) == false ||
+                        msg.Equals(demotionReason) == false)
+                    {
+                        topology.DemotionReasons[promotable] = msg;
+                        topology.PromotablesStatus[promotable] = DatabasePromotionStatus.RaftIndexNotUpToDate;
+                        return (false, msg);
+                    }
+                    return (false, null);
+                }
+            }
+
             var indexesCaughtUp = CheckIndexProgress(
                 promotablePrevDbStats.LastEtag,
                 promotablePrevDbStats.LastIndexStats,

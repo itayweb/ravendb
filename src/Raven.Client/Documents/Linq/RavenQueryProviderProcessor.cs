@@ -460,23 +460,74 @@ namespace Raven.Client.Documents.Linq
                 return;
             }
 
-            var methodCallExpression = expression.Left as MethodCallExpression;
-            // checking for VB.NET string equality
-            if (methodCallExpression != null && methodCallExpression.Method.Name == "CompareString" &&
-                expression.Right.NodeType == ExpressionType.Constant &&
-                Equals(((ConstantExpression)expression.Right).Value, 0))
+            if (expression.Left is MethodCallExpression methodCallExpression)
             {
-                var expressionMemberInfo = GetMember(methodCallExpression.Arguments[0]);
-                DocumentQuery.WhereEquals(
-                    new WhereParams
-                    {
-                        FieldName = expressionMemberInfo.Path,
-                        Value = GetValueFromExpression(methodCallExpression.Arguments[1], GetMemberType(expressionMemberInfo)),
-                        AllowWildcards = false,
-                        Exact = _insideExact
-                    });
+                // checking for VB.NET string equality
+                if (methodCallExpression.Method.Name == "CompareString" &&
+                    expression.Right.NodeType == ExpressionType.Constant &&
+                    Equals(((ConstantExpression)expression.Right).Value, 0))
+                {
+                    var expressionMemberInfo = GetMember(methodCallExpression.Arguments[0]);
+                    DocumentQuery.WhereEquals(
+                        new WhereParams
+                        {
+                            FieldName = expressionMemberInfo.Path,
+                            Value = GetValueFromExpression(methodCallExpression.Arguments[1], GetMemberType(expressionMemberInfo)),
+                            AllowWildcards = false,
+                            Exact = _insideExact
+                        });
 
-                return;
+                    return;
+                }
+
+                if (methodCallExpression.Method.DeclaringType == typeof(string))
+                {
+                    ExpressionInfo expressionMemberInfo = null;
+                    Expression argument = null;
+                    var exact = _insideExact |methodCallExpression.Method.Name == nameof(string.CompareOrdinal);
+
+                    var isSimpleCompare = nameof(string.Compare) == methodCallExpression.Method.Name;
+                    var argumentsCount = methodCallExpression.Arguments.Count;
+                    
+                    if (isSimpleCompare == false && argumentsCount > 2)
+                        throw new NotSupportedException($"We do not support such overloads in '{methodCallExpression.Method.Name}'.");
+                    if (isSimpleCompare)
+                    {
+                        if (argumentsCount == 3 && exact == false)
+                            exact = ConvertStringComparisonToExact(methodCallExpression.Arguments[2]);
+                        else if (argumentsCount > 3)
+                            throw new NotSupportedException($"We do not support such overloads in '{methodCallExpression.Method.Name}'.");
+                    }
+                    
+                    switch (methodCallExpression.Method.Name)
+                    {
+                        case nameof(string.Compare):
+                        case nameof(string.CompareOrdinal):
+                            EnsureStringComparisonMethodComparedWithZero(expression, methodCallExpression);
+                            expressionMemberInfo = GetMember(methodCallExpression.Arguments[0]);
+                            argument = methodCallExpression.Arguments[1];
+                            
+                            break;
+                        case nameof(string.CompareTo):
+                            EnsureStringComparisonMethodComparedWithZero(expression, methodCallExpression);
+                            expressionMemberInfo = GetMember(methodCallExpression.Object);
+                            argument = methodCallExpression.Arguments[0];
+                            break;
+                    }
+
+                    if (expressionMemberInfo != null)
+                    {
+                        DocumentQuery.WhereEquals(
+                            new WhereParams
+                            {
+                                FieldName = expressionMemberInfo.Path,
+                                Value = GetValueFromExpression(argument, GetMemberType(expressionMemberInfo)),
+                                AllowWildcards = false,
+                                Exact = exact
+                            });
+                        return;
+                    }
+                }
             }
 
             if (IsMemberAccessForQuerySource(expression.Left) == false && IsMemberAccessForQuerySource(expression.Right))
@@ -529,23 +580,60 @@ namespace Raven.Client.Documents.Linq
 
         private void VisitNotEquals(BinaryExpression expression)
         {
-            var methodCallExpression = expression.Left as MethodCallExpression;
             // checking for VB.NET string equality
-            if (methodCallExpression != null && methodCallExpression.Method.Name == "CompareString" &&
-                expression.Right.NodeType == ExpressionType.Constant &&
-                Equals(((ConstantExpression)expression.Right).Value, 0))
+            if (expression.Left is MethodCallExpression methodCallExpression) 
             {
-                var expressionMemberInfo = GetMember(methodCallExpression.Arguments[0]);
-                DocumentQuery.WhereNotEquals(new WhereParams
-                {
-                    FieldName = expressionMemberInfo.Path,
-                    Value = GetValueFromExpression(methodCallExpression.Arguments[0], GetMemberType(expressionMemberInfo)),
-                    AllowWildcards = false,
-                    Exact = _insideExact
-                });
-                return;
-            }
 
+                if (methodCallExpression.Method.Name == "CompareString" &&
+                    expression.Right.NodeType == ExpressionType.Constant &&
+                    Equals(((ConstantExpression)expression.Right).Value, 0))
+                {
+                    var expressionMemberInfo = GetMember(methodCallExpression.Arguments[0]);
+                    DocumentQuery.WhereNotEquals(new WhereParams
+                    {
+                        FieldName = expressionMemberInfo.Path,
+                        Value = GetValueFromExpression(methodCallExpression.Arguments[0], GetMemberType(expressionMemberInfo)),
+                        AllowWildcards = false,
+                        Exact = _insideExact
+                    });
+                    return;
+                }
+
+                if (methodCallExpression.Method.DeclaringType == typeof(string))
+                {
+                    ExpressionInfo expressionMemberInfo = null;
+                    Expression argument = null;
+                    var exact = _insideExact | methodCallExpression.Method.Name == nameof(string.CompareOrdinal);
+                    switch (methodCallExpression.Method.Name)
+                    {
+                        case nameof(string.Compare):
+                        case nameof(string.CompareOrdinal):
+                            EnsureStringComparisonMethodComparedWithZero(expression, methodCallExpression);
+                            expressionMemberInfo = GetMember(methodCallExpression.Arguments[0]);
+                            argument = methodCallExpression.Arguments[1];
+                            break;
+                        case nameof(string.CompareTo):
+                            EnsureStringComparisonMethodComparedWithZero(expression, methodCallExpression);
+                            expressionMemberInfo = GetMember(methodCallExpression.Object);
+                            argument = methodCallExpression.Arguments[0];
+                            break;
+                    }
+
+                    if (expressionMemberInfo != null)
+                    {
+                        DocumentQuery.WhereNotEquals(
+                            new WhereParams
+                            {
+                                FieldName = expressionMemberInfo.Path,
+                                Value = GetValueFromExpression(argument, GetMemberType(expressionMemberInfo)),
+                                AllowWildcards = false,
+                                Exact = exact
+                            });
+                        return;
+                    }
+                }
+            }
+            
             if (IsMemberAccessForQuerySource(expression.Left) == false && IsMemberAccessForQuerySource(expression.Right))
             {
                 VisitNotEquals(Expression.NotEqual(expression.Right, expression.Left));
@@ -567,6 +655,16 @@ namespace Raven.Client.Documents.Linq
             });
         }
 
+        private static void EnsureStringComparisonMethodComparedWithZero(BinaryExpression expression, MethodCallExpression mce)
+        {
+            bool comparedToConstantZero = expression.Right.NodeType == ExpressionType.Constant &&
+                                          Equals(((ConstantExpression)expression.Right).Value, 0);
+            if (comparedToConstantZero == false)
+            {
+                throw new NotSupportedException("Usage of " + mce.Method + ", requires a comparison to a constant 0 only (use: string.Compare(x.Value, Arg) == 0 ), but was: " + expression);
+            }
+        }
+        
         private static Type GetMemberType(ExpressionInfo info)
         {
             return info.Type;
@@ -682,7 +780,7 @@ namespace Raven.Client.Documents.Linq
 
         private void VisitEquals(MethodCallExpression expression)
         {
-            GetEqualsArgumentsFromExpression(expression, out var firstArg, out var secondArg, out var comparisonArg);
+            GetStringComparisonArgumentsFromExpression(expression, out var firstArg, out var secondArg, out var comparisonArg);
 
             ExpressionInfo fieldInfo;
             Expression constant;
@@ -708,35 +806,45 @@ namespace Raven.Client.Documents.Linq
                                                 $"`{firstArg}` and `{secondArg}` are both constants, so cannot convert {expression} to a proper query.");
             }
 
-            if (comparisonArg != null
-                && comparisonArg.NodeType == ExpressionType.Constant
-                && comparisonArg.Type == typeof(StringComparison))
-            {
-                var comparisonType = ((ConstantExpression)comparisonArg).Value;
-                switch ((StringComparison)comparisonType)
-                {
-                    case StringComparison.CurrentCulture:
-                    case StringComparison.Ordinal:
-                        throw new NotSupportedException(
-                            "RavenDB queries case sensitivity is dependent on the index, not the query. If you need case sensitive queries, use a static index and an NotAnalyzed field for that.");
-                    case StringComparison.CurrentCultureIgnoreCase:
-                    case StringComparison.OrdinalIgnoreCase:
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
+            bool exact = _insideExact ? true : ConvertStringComparisonToExact(comparisonArg);
 
             DocumentQuery.WhereEquals(new WhereParams
             {
                 FieldName = fieldInfo.Path,
                 Value = GetValueFromExpression(constant, GetMemberType(fieldInfo)),
                 AllowWildcards = false,
-                Exact = _insideExact
+                Exact = exact
             });
         }
 
-        private static void GetEqualsArgumentsFromExpression(MethodCallExpression expression, out Expression firstArg, out Expression secondArg, out Expression comparisonArg)
+        private static bool ConvertStringComparisonToExact(Expression comparisonArg)
+        {
+            if (comparisonArg != null
+                    && comparisonArg.NodeType == ExpressionType.Constant
+                    && comparisonArg.Type == typeof(StringComparison))
+            {
+                var comparisonType = ((ConstantExpression)comparisonArg).Value;
+                switch ((StringComparison)comparisonType)
+                {
+                    case StringComparison.InvariantCulture:
+                    case StringComparison.CurrentCulture:
+                    case StringComparison.Ordinal:
+                        return true;
+
+                    case StringComparison.InvariantCultureIgnoreCase:
+                    case StringComparison.CurrentCultureIgnoreCase:
+                    case StringComparison.OrdinalIgnoreCase:
+                        break;
+
+                    default:
+                        throw new ArgumentOutOfRangeException("value", comparisonType, "Unsupported string comparison type.");
+                }
+            }
+
+            return false;
+        }
+
+        private static void GetStringComparisonArgumentsFromExpression(MethodCallExpression expression, out Expression firstArg, out Expression secondArg, out Expression comparisonArg)
         {
             comparisonArg = null;
             if (expression.Object == null)
@@ -763,20 +871,28 @@ The recommended method is to use full text search (mark the field as Analyzed an
 
         private void VisitStartsWith(MethodCallExpression expression)
         {
+            GetStringComparisonArgumentsFromExpression(expression, out var firstArg, out var secondArg, out var comparisonArg);
+
             var memberInfo = GetMember(expression.Object);
+
+            bool exact = _insideExact ? true : ConvertStringComparisonToExact(comparisonArg);
 
             DocumentQuery.WhereStartsWith(
                 memberInfo.Path,
-                GetValueFromExpression(expression.Arguments[0], GetMemberType(memberInfo)), _insideExact);
+                GetValueFromExpression(expression.Arguments[0], GetMemberType(memberInfo)), exact);
         }
 
         private void VisitEndsWith(MethodCallExpression expression)
         {
+            GetStringComparisonArgumentsFromExpression(expression, out var firstArg, out var secondArg, out var comparisonArg);
+
             var memberInfo = GetMember(expression.Object);
+
+            bool exact = _insideExact ? true : ConvertStringComparisonToExact(comparisonArg);
 
             DocumentQuery.WhereEndsWith(
                 memberInfo.Path,
-                GetValueFromExpression(expression.Arguments[0], GetMemberType(memberInfo)), _insideExact);
+                GetValueFromExpression(expression.Arguments[0], GetMemberType(memberInfo)), exact);
         }
 
         private void VisitIsNullOrEmpty(MethodCallExpression expression, bool notEquals)
@@ -1023,7 +1139,7 @@ The recommended method is to use full text search (mark the field as Analyzed an
                     return false;
             }
 
-            bool checkValidComparison(MethodCallExpression methodCall, Expression compareExpression)
+            bool CheckValidComparison(MethodCallExpression methodCall, Expression compareExpression)
             {
                 // non-static string compare: x => x.CompareTo("Dave") > 0
                 if (methodCall.Object != null)
@@ -1052,7 +1168,7 @@ The recommended method is to use full text search (mark the field as Analyzed an
             {
                 if (leftMethodCall.Method.Name == nameof(string.CompareTo) || leftMethodCall.Method.Name == nameof(string.Compare))
                 {
-                    if (!checkValidComparison(leftMethodCall, expression.Right))
+                    if (CheckValidComparison(leftMethodCall, expression.Right) == false)
                         return false;
 
                     return true;
@@ -1062,7 +1178,7 @@ The recommended method is to use full text search (mark the field as Analyzed an
             {
                 if (rightMethodCall.Method.Name == nameof(string.CompareTo) || rightMethodCall.Method.Name == nameof(string.Compare))
                 {
-                    if (!checkValidComparison(rightMethodCall, expression.Left))
+                    if (CheckValidComparison(rightMethodCall, expression.Left) == false)
                         return false;
 
                     return true;

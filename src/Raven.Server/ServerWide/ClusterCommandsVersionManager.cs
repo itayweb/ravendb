@@ -85,6 +85,7 @@ namespace Raven.Server.ServerWide
             [nameof(AddRavenEtlCommand)] = Base40CommandsVersion,
             [nameof(AddSqlEtlCommand)] = Base40CommandsVersion,
             [nameof(AddElasticSearchEtlCommand)] = Base40CommandsVersion,
+
             [nameof(RemoveEtlProcessStateCommand)] = Base40CommandsVersion,
             [nameof(UpdateRavenEtlCommand)] = Base40CommandsVersion,
             [nameof(UpdateSqlEtlCommand)] = Base40CommandsVersion,
@@ -147,6 +148,15 @@ namespace Raven.Server.ServerWide
 
             [nameof(EditPostgreSqlConfigurationCommand)] = 53_000,
             [nameof(RecordBatchSubscriptionDocumentsCommand)] = 53_000,
+
+            [nameof(AddQueueEtlCommand)] = 54_000,
+            [nameof(UpdateQueueEtlCommand)] = 54_000,
+            [nameof(PutQueueConnectionStringCommand)] = 54_000,
+            [nameof(RemoveQueueConnectionStringCommand)] = 54_000,
+
+            [nameof(PutDatabaseStudioConfigurationCommand)] = 54_001,
+            [nameof(PutDatabaseSettingsCommand)] = 54_001,
+            [nameof(PutDatabaseClientConfigurationCommand)] = 54_001,
         };
 
         public static bool CanPutCommand(string command)

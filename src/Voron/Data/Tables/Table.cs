@@ -220,6 +220,12 @@ namespace Voron.Data.Tables
             return RawDataSection.DirectRead(_tx.LowLevelTransaction, id, out size, out compressed);
         }
 
+        public void DirectRead(long id, out TableValueReader tvr)
+        {
+            var rawData = DirectRead(id, out int size);
+            tvr = new TableValueReader(id, rawData, size);
+        }
+
         public byte* DirectRead(long id, out int size)
         {
             var result = DirectReadRaw(id, out size, out var compressed);
@@ -254,19 +260,46 @@ namespace Voron.Data.Tables
             size = buffer.Length;
             return buffer.Ptr;
         }
+        
+        private static ReadOnlySpan<byte> LookupTable => new byte[] { 5, 6, 7, 9 };
+        private static int GetDecompressedSize(Span<byte> buffer)
+        {
+            byte marker = buffer[4];
+            int dicIdCode = marker & 3;
+            bool singleElement = ((marker >> 5) & 1) == 1;
+            int sizeId = marker >> 6;
+            if (dicIdCode > 3)
+                throw new ArgumentOutOfRangeException("DicId was: +" + dicIdCode, nameof(dicIdCode));
+
+            var pos = (int)LookupTable[dicIdCode];
+            if (singleElement == false)
+                pos++;
+       
+            ulong decompressedSize = sizeId switch
+            {
+                0 => buffer[pos],
+                1 => Unsafe.ReadUnaligned<ushort>(ref buffer[pos]) + 256UL,
+                2 => Unsafe.ReadUnaligned<uint>(ref buffer[pos]),
+                3 => Unsafe.ReadUnaligned<ulong>(ref buffer[pos]),
+                _ => throw new ArgumentOutOfRangeException(nameof(sizeId))
+            };
+            if (decompressedSize > int.MaxValue)
+                throw new ArgumentException("Decompress size cannot be " + decompressedSize, nameof(decompressedSize));
+            return (int)decompressedSize;
+        }
 
         internal static ByteStringContext<ByteStringMemoryCache>.InternalScope DecompressValue(
             Transaction tx,
             byte* ptr, int size, out ByteString buffer)
         {
             var dicId = BlittableJsonReaderBase.ReadVariableSizeIntInReverse(ptr, size - 1, out var offset);
-            var data = new ReadOnlySpan<byte>(ptr, size - offset);
+            int length = size - offset;
             var dictionary = tx.LowLevelTransaction.Environment.CompressionDictionariesHolder
                 .GetCompressionDictionaryFor(tx, dicId);
 
-            int decompressedSize = ZstdLib.GetDecompressedSize(data);
+            int decompressedSize = GetDecompressedSize(new Span<byte>(ptr, length));
             var internalScope = tx.Allocator.Allocate(decompressedSize, out buffer);
-            var actualSize = ZstdLib.Decompress(data, buffer.ToSpan(), dictionary);
+            var actualSize = ZstdLib.Decompress(ptr, length, buffer.Ptr, buffer.Length, dictionary);
             if (actualSize != decompressedSize)
                 throw new InvalidDataException($"Got decompressed size {actualSize} but expected {decompressedSize} in tx #{tx.LowLevelTransaction.Id}, dic id: {dictionary?.Id ?? 0}");
             return internalScope;
@@ -1101,11 +1134,11 @@ namespace Voron.Data.Tables
             reader = new TableValueReader(id, ptr, size);
         }
 
-        public long GetNumberOfEntriesAfter(TableSchema.FixedSizeSchemaIndexDef index, long afterValue, out long totalCount)
+        public long GetNumberOfEntriesAfter(TableSchema.FixedSizeSchemaIndexDef index, long afterValue, out long totalCount, Stopwatch overallDuration)
         {
             var fst = GetFixedSizeTree(index);
 
-            return fst.GetNumberOfEntriesAfter(afterValue, out totalCount);
+            return fst.GetNumberOfEntriesAfter(afterValue, out totalCount, overallDuration);
         }
 
         public long GetNumberOfEntriesFor(TableSchema.FixedSizeSchemaIndexDef index)
@@ -1893,7 +1926,7 @@ namespace Voron.Data.Tables
                         return false;
 
                     var id = it.CreateReaderForCurrent().ReadLittleEndianInt64();
-                    var ptr = DirectRead(id, out var size);
+                    var ptr = DirectRead(id, out int size);
 
                     if (tableValueHolder == null)
                         tableValueHolder = new TableValueHolder();

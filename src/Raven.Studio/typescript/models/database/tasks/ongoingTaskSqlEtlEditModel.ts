@@ -19,7 +19,15 @@ class ongoingTaskSqlEtlEditModel extends ongoingTaskEditModel {
     validationGroup: KnockoutValidationGroup;
     enterTestModeValidationGroup: KnockoutValidationGroup;
     dirtyFlag: () => DirtyFlag;
-   
+    
+    get studioTaskType(): StudioTaskType {
+        return "SqlEtl";
+    }
+
+    get destinationType(): TaskDestinationType {
+        return "Table";
+    }
+    
     constructor(dto: Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskSqlEtlDetails) {
         super();
 
@@ -144,6 +152,10 @@ class ongoingTaskSqlEtlEditModel extends ongoingTaskEditModel {
                      SqlTables: []
                 }
             } as Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskSqlEtlDetails);
+    }
+
+    hasAdvancedOptionsDefined(): boolean {
+        return !!this.commandTimeout() || this.parameterizedDeletes() || this.forceRecompileQuery() || this.tableQuotation();
     }
 }
 

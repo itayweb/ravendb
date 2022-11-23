@@ -43,9 +43,11 @@ namespace Raven.Server.Documents.Indexes.Auto
             {
                 var map = $"{Collections.First()}:[{string.Join(";", mapFields.Select(x => $"<Name:{x}>"))}]";
                 indexDefinition.Maps.Add(map);
-
-                foreach (var field in indexFields)
+                
+                foreach (var field in indexFields.OrderBy(x => x.Name, StringComparer.Ordinal))
+                {
                     indexDefinition.Fields[field.Name] = field.Options;
+                }
             }
 
             if (MapFields.Count > 0)
@@ -127,7 +129,6 @@ namespace Raven.Server.Documents.Indexes.Auto
                 throw new InvalidOperationException("No persisted lock mode");
 
             var fields = new AutoIndexField[jsonArray.Length];
-
             for (var i = 0; i < jsonArray.Length; i++)
             {
                 var json = jsonArray.GetByIndex<BlittableJsonReaderObject>(i);
@@ -143,12 +144,18 @@ namespace Raven.Server.Documents.Indexes.Auto
                     Storage = FieldStorage.No,
                     Indexing = (AutoFieldIndexing)Enum.Parse(typeof(AutoFieldIndexing), indexing),
                     HasSuggestions = hasSuggestions,
-                    HasQuotedName = hasQuotedName
+                    HasQuotedName = hasQuotedName,
                 };
 
                 fields[i] = field;
             }
 
+            int idX = 1;
+            foreach (var field in fields.OrderBy(x => x.Name, StringComparer.Ordinal))
+            {
+                field.Id = idX++;
+            }
+            
             return new AutoMapIndexDefinition(collections[0], fields, deploymentMode: null, version)
             {
                 LockMode = lockMode,

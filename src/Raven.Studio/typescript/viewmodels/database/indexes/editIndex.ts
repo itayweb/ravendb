@@ -41,6 +41,10 @@ import getServerWideCustomAnalyzersCommand = require("commands/serverWide/analyz
 import getIndexDefaultsCommand = require("commands/database/index/getIndexDefaultsCommand");
 import moment = require("moment");
 import { highlight, languages } from "prismjs";
+import configurationConstants from "configuration";
+import mergedIndexesStorage from "common/storage/mergedIndexesStorage";
+import database = require("models/resources/database");
+import getIndexesDefinitionsCommand = require("commands/database/index/getIndexesDefinitionsCommand");
 
 class editIndex extends viewModelBase {
     
@@ -50,6 +54,7 @@ class editIndex extends viewModelBase {
     static readonly ContainerSelector = ".edit-index";
 
     isEditingExistingIndex = ko.observable<boolean>(false);
+    indexesToDeleteAfterMerge = ko.observableArray<string>([]); // represents index merge mode
     editedIndex = ko.observable<indexDefinition>();
     isAutoIndex = ko.observable<boolean>(false);
 
@@ -95,6 +100,14 @@ class editIndex extends viewModelBase {
         return this.formatDeploymentMode(deploymentMode);
     });
 
+    defaultSearchEngine = ko.observable<Raven.Client.Documents.Indexes.SearchEngineType>();
+    searchEngineConfiguration = ko.observable<Raven.Client.Documents.Indexes.SearchEngineType>();
+
+    inheritSearchEngineText: KnockoutComputed<string>;
+    effectiveSearchEngineText: KnockoutComputed<string>;
+
+    static readonly searchEngineConfigurationLabel = configurationConstants.indexing.staticIndexingEngineType;
+
     constructor() {
         super();
 
@@ -111,8 +124,8 @@ class editIndex extends viewModelBase {
             "addReduce",
             "removeAssembly",
             "addNamespaceToAssemblyWithBlink",
-            "loadIndexDefinitionFromHistory",
-            "loadMapReduceFromHistory",
+            "loadFullIndexDefinitionFromHistory",
+            "loadOnlyMapAndReduceFromHistory",
             "useIndexRevisionItem",
             "previewIndex");
 
@@ -186,6 +199,36 @@ class editIndex extends viewModelBase {
         this.previewItemNodes = ko.pureComputed<string[]>(() => {
             return this.previewItem() ? Object.keys(this.previewItem().RollingDeployment).reverse() : [];
         })
+
+        this.inheritSearchEngineText = ko.pureComputed(() => {
+            const engineFormatted = editIndex.formatEngine(this.defaultSearchEngine());
+            return `Inherit (${engineFormatted})`;
+        });
+
+        this.effectiveSearchEngineText = ko.pureComputed(() => {
+            if (this.searchEngineConfiguration()) {
+                return editIndex.formatEngine(this.searchEngineConfiguration());
+            }
+            
+            return this.inheritSearchEngineText();
+        });
+        
+        this.searchEngineConfiguration.subscribe((engine: Raven.Client.Documents.Indexes.SearchEngineType) => {
+            let valueToUpdate: Raven.Client.Documents.Indexes.SearchEngineType = "Lucene";
+            
+            if ((engine === "Corax") || (!engine && this.defaultSearchEngine() === "Corax")) {
+                valueToUpdate = "Corax";
+            }
+
+            this.editedIndex().searchEngine(valueToUpdate);
+        }) 
+    }
+    
+    static formatEngine(engine: Raven.Client.Documents.Indexes.SearchEngineType) {
+        if (engine === "Corax") {
+            return engine + " - experimental";
+        }
+        return engine;
     }
 
     canActivate(indexToEdit: string): JQueryPromise<canActivateResultDto> {
@@ -196,8 +239,29 @@ class editIndex extends viewModelBase {
                 const db = this.activeDatabase();
 
                 if (indexToEditName) {
-                    this.isEditingExistingIndex(true);
                     const canActivateResult = $.Deferred<canActivateResultDto>();
+                    
+                    // before loading index from server check if it isn't merge suggestion
+                    try {
+                        const merged = mergedIndexesStorage.getMergedIndex(db, indexToEditName);
+                        if (merged) {
+                            this.indexesToDeleteAfterMerge(merged.indexesToDelete);
+                            this.editedIndex(new indexDefinition(merged.definition));
+                            this.initIndex();
+                            this.originalIndexName = indexToEditName;
+                            
+                            canActivateResult.resolve({ can: true });
+                            return canActivateResult;
+                        }
+                    } catch (e) {
+                        messagePublisher.reportError("Could not load " + indexToEditName + " index");
+                        canActivateResult.resolve({ redirect: appUrl.forIndexes(db) });
+                        
+                        return canActivateResult;
+                    }
+                    
+                    this.isEditingExistingIndex(true);
+                    
                     this.fetchIndexToEdit(indexToEditName)
                         .done(() => canActivateResult.resolve({ can: true }))
                         .fail(() => {
@@ -232,16 +296,37 @@ class editIndex extends viewModelBase {
         if (!this.editedIndex().isAutoIndex() && !!indexToEditName) {
             this.showIndexHistory(true);
         }
-            
+
         return $.when<any>(this.fetchCustomAnalyzers(), this.fetchServerWideCustomAnalyzers(), this.fetchIndexDefaults())
             .done(([analyzers]: [Array<Raven.Client.Documents.Indexes.Analysis.AnalyzerDefinition>],
                    [serverWideAnalyzers]: [Array<Raven.Client.Documents.Indexes.Analysis.AnalyzerDefinition>],
                    [indexDefaults]: [Raven.Server.Web.Studio.StudioDatabaseTasksHandler.IndexDefaults]) => {
+                
                 const analyzersList = [...analyzers.map(x => x.Name), ...serverWideAnalyzers.map(x => x.Name)];
+
+                this.defaultDeploymentMode(indexDefaults.StaticIndexDeploymentMode);
+                this.defaultSearchEngine(indexDefaults.StaticIndexingEngineType === "None" ? "Lucene" : indexDefaults.StaticIndexingEngineType);
+                
+                this.extractSearchEngineFromConfig();
+
                 this.editedIndex().registerCustomAnalyzers(analyzersList);
                 
                 this.defaultDeploymentMode(indexDefaults.StaticIndexDeploymentMode);
-        });
+            });
+    }
+    
+    extractSearchEngineFromConfig() {
+        const existingSearchConfig = this.editedIndex().configuration().find(x => x.key() === editIndex.searchEngineConfigurationLabel);
+        
+        if (existingSearchConfig) {
+            this.editedIndex().configuration.remove(existingSearchConfig);
+
+            const value = existingSearchConfig.value() as Raven.Client.Documents.Indexes.SearchEngineType;
+            this.searchEngineConfiguration(value);
+            
+        } else {
+            this.searchEngineConfiguration(null);
+        }
     }
 
     attached() {
@@ -330,8 +415,9 @@ class editIndex extends viewModelBase {
 
     private fetchIndexHistory() {
         const db = this.activeDatabase();
+        const indexNameToUse = this.isEditingExistingIndex() ? (this.editedIndex().name() || this.originalIndexName) : this.originalIndexName;
         
-        return new getIndexHistoryCommand(db, this.editedIndex().name() || this.originalIndexName)
+        return new getIndexHistoryCommand(db, indexNameToUse)
             .execute()
             .done((indexHistory) => this.indexHistory(indexHistory.History));
     }
@@ -365,31 +451,37 @@ class editIndex extends viewModelBase {
 
     useIndexRevisionItem(item: Raven.Client.ServerWide.IndexHistoryEntry) {
         this.previewItem(item);
-        this.loadIndexDefinitionFromHistory();
+        this.loadFullIndexDefinitionFromHistory();
     }
     
-    loadIndexDefinitionFromHistory() {
+    loadFullIndexDefinitionFromHistory() {
+        const currentIndexName = this.editedIndex().name();
+        
         const newIndexDefinition = new indexDefinition(this.previewItem().Definition);
 
         if (!this.isEditingExistingIndex()) {
-            // if editing a clone then load the index definition without the index name
-            newIndexDefinition.name(null);
+            // if editing a clone then keep the clone name
+            newIndexDefinition.name(currentIndexName);
         }
         
-        this.editedIndex(newIndexDefinition);
-        
-        this.loadedIndexHistory(true);
+        this.loadIndexDefinition(newIndexDefinition);
     }
 
-    loadMapReduceFromHistory() {
+    loadOnlyMapAndReduceFromHistory() {
         const previewItem = this.previewItem();
         const mapsFromPreview = previewItem.Definition.Maps;
         const reduceFromPreview = previewItem.Definition.Reduce;
         
         const newIndexDefinition = new indexDefinition(this.editedIndex().toDto());
         newIndexDefinition.setMapsAndReduce(mapsFromPreview, reduceFromPreview);
-        this.editedIndex(newIndexDefinition);
-
+        
+        this.loadIndexDefinition(newIndexDefinition);
+    }
+    
+    private loadIndexDefinition(indexDefinitionToLoad: indexDefinition) {
+        this.editedIndex(indexDefinitionToLoad);
+        this.extractSearchEngineFromConfig();
+        this.initFieldTooltips();
         this.loadedIndexHistory(true);
     }
 
@@ -448,7 +540,7 @@ class editIndex extends viewModelBase {
         new getIndexFieldsFromMapCommand(this.activeDatabase(), map, additionalSourcesDto, additionalAssembliesDto)
             .execute()
             .done((fields: resultsDto<string>) => {
-                this.fieldNames(fields.Results);
+                this.fieldNames(fields.Results.filter(x => !index.FieldsToHideOnUi.includes(x)));
             });
     }
 
@@ -509,6 +601,7 @@ class editIndex extends viewModelBase {
             hasDefaultFieldOptions,
             hasAnyDirtyDefaultFieldOptions,
             hasAnyDirtyAdditionalAssembly,
+            this.searchEngineConfiguration
         ], false, jsonUtil.newLineNormalizingHashFunction);
 
         this.isSaveEnabled = ko.pureComputed(() => {
@@ -640,20 +733,26 @@ class editIndex extends viewModelBase {
         return new getIndexDefinitionCommand(indexName, this.activeDatabase())
             .execute()
             .done(result => {
-
                 if (result.Type.startsWith("Auto")) {
-                    // Auto Index
-                    this.isAutoIndex(true);
                     this.editedIndex(new autoIndexDefinition(result));
                 } else {
-                    // Regular Index
                     this.editedIndex(new indexDefinition(result));
-                    this.updateIndexFields();
                 }
 
-                this.originalIndexName = this.editedIndex().name();
-                this.editedIndex().hasReduce(!!this.editedIndex().reduce());
+                this.initIndex();
             });
+    }
+    
+    private initIndex() {
+        if (this.editedIndex() instanceof autoIndexDefinition) {
+            this.isAutoIndex(true);    
+        } else {
+            // regular index
+            this.updateIndexFields();
+        }
+
+        this.originalIndexName = this.editedIndex().name();
+        this.editedIndex().hasReduce(!!this.editedIndex().reduce());
     }
 
     private validate(): boolean {
@@ -746,6 +845,12 @@ class editIndex extends viewModelBase {
             }*/
 
             const indexDto = editedIndex.toDto();
+            
+            if (this.searchEngineConfiguration()) {
+                indexDto.Configuration[editIndex.searchEngineConfigurationLabel] = this.searchEngineConfiguration();
+            } else {
+                delete indexDto.Configuration[editIndex.searchEngineConfigurationLabel];
+            }
 
             this.saveIndex(indexDto)
                 .always(() => this.saveInProgress(false));
@@ -761,6 +866,7 @@ class editIndex extends viewModelBase {
         }
 
         const db = this.activeDatabase();
+        const indexName = this.editedIndex().name();
         
         return new detectIndexTypeCommand(indexDto, db)
             .execute()
@@ -770,9 +876,35 @@ class editIndex extends viewModelBase {
                     .execute()
                     .done(() => {
                         this.resetDirtyFlag();
-                        router.navigate(appUrl.forIndexes(db, this.editedIndex().name()));
+                        
+                        if (this.indexesToDeleteAfterMerge().length) {
+                            mergedIndexesStorage.deleteMergedIndex(db, this.originalIndexName);
+                            this.confirmAfterMergeDeletion(db, indexName, this.indexesToDeleteAfterMerge());
+                        } else {
+                            editIndex.navigateToIndexesList(db, indexName);    
+                        }
                     });
             });
+    }
+    
+    private confirmAfterMergeDeletion(db: database, mergedIndexName: string, toDelete: string[]) {
+        return new getIndexesDefinitionsCommand(db, 0, 1024 * 1024)
+            .execute()
+            .done((indexDefinitions) => {
+                const matchedIndexes = indexDefinitions.filter(x => toDelete.includes(x.Name)).map(x => new indexDefinition(x));
+
+                const deleteViewModel = new deleteIndexesConfirm(matchedIndexes, db);
+                deleteViewModel.deleteTask.done((done) => {
+                    if (done) {
+                        editIndex.navigateToIndexesList(db, mergedIndexName);
+                    }
+                });
+                app.showBootstrapDialog(deleteViewModel);
+            });
+    }
+    
+    private static navigateToIndexesList(db: database, indexToHighlight: string) {
+        router.navigate(appUrl.forIndexes(db, indexToHighlight));
     }
     
     private resetDirtyFlag() {
@@ -817,7 +949,7 @@ class editIndex extends viewModelBase {
 
     cloneIndex() {
         this.isEditingExistingIndex(false);
-        this.editedIndex().name(null);
+        this.editedIndex().name(`CloneOf/${this.editedIndex().name()}`);
         this.editedIndex().reduceOutputCollectionName(null);
         this.editedIndex().patternForReferencesToReduceOutputCollection(null);
         this.editedIndex().collectionNameForReferenceDocuments(null);
@@ -946,7 +1078,7 @@ class editIndex extends viewModelBase {
     private initFieldTooltips() {
         this.setupDisableReasons();
 
-        popoverUtils.longWithHover($(".store-field-info"),
+        popoverUtils.longWithHover($(".store-field-info-lucene"), 
             {
                 content: `
                          <h3 class="margin-top">Please verify whether you need to store the field in the index:</h3>

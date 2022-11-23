@@ -289,6 +289,10 @@ class indexPerformance extends viewModelBase {
             "SaveOutputDocuments": undefined as string,
             "DeleteOutputDocuments": undefined as string,
             "LoadCompareExchangeValue": undefined as string,
+            "Corax/Delete": undefined as string,
+            "Corax/Commit": undefined as string,
+            "Corax/Convert": undefined as string,
+            "Corax/AddDocument": undefined as string,
             "UnknownOperation": undefined as string
         }
     };
@@ -1218,7 +1222,8 @@ class indexPerformance extends viewModelBase {
                     countsDetails += `<div class="tooltip-li">Average Document Size: <div class="value">${generalUtils.formatBytesToSize(parentStats.DocumentsSize.SizeInBytes / parentStats.InputCount)}</div></div>`;
                 }
 
-                countsDetails += `<div class="tooltip-li">Managed Allocation Size: <div class="value">${parentStats.AllocatedBytes.HumaneSize}</div></div>`;
+                countsDetails += `<div class="tooltip-li">Managed Allocations (accumulated): <div class="value">${parentStats.AllocatedManagedBytes.HumaneSize}</div></div>`;
+                countsDetails += `<div class="tooltip-li">Unmanaged Allocations: <div class="value">${parentStats.AllocatedUnmanagedBytes.HumaneSize}</div></div>`;
 
                 if (element.DurationInMs > 0) {
                     const durationInSec = element.DurationInMs / 1000;

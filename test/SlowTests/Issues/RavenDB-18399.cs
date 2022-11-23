@@ -8,6 +8,7 @@ using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Operations;
 using Raven.Client.Documents.Operations.Indexes;
+using Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -21,10 +22,11 @@ public class RavenDB_18399 : RavenTestBase
     {
     }
 
-    [Fact]
-    public void DateAndTimeOnlyTestInIndex()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void DateAndTimeOnlyTestInIndex(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         CreateDatabaseData(store);
         CreateIndex<DateAndTimeOnlyIndex>(store);
         {
@@ -41,10 +43,11 @@ public class RavenDB_18399 : RavenTestBase
         }
     }
 
-    [Fact]
-    public void IndexWithLetQueries()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void IndexWithLetQueries(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         CreateDatabaseData(store);
         CreateIndex<MapReduceWithLetAndNullableItems>(store);
         using var session = store.OpenSession();
@@ -60,13 +63,14 @@ public class RavenDB_18399 : RavenTestBase
         });
     }
 
-    [Fact]
-    public void UsingFilter()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void UsingFilter(Options options)
     {
         var dateOnly = default(DateOnly).AddDays(300);
         var timeOnly = new TimeOnly(0, 0, 0, 234).AddMinutes(300);
 
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         CreateDatabaseData(store);
         using var session = store.OpenSession();
         var result = session
@@ -81,10 +85,11 @@ public class RavenDB_18399 : RavenTestBase
         Assert.Equal(timeOnly, result.TimeOnly);
     }
 
-    [Fact]
-    public void DateTimeToDateOnlyWithLet()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void DateTimeToDateOnlyWithLet(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         CreateDatabaseData(store);
         CreateIndex<IndexWithDateTimeAndDateOnly>(store);
         
@@ -102,10 +107,11 @@ public class RavenDB_18399 : RavenTestBase
         });
     }
 
-    [Fact]
-    public void TransformDateInJsPatch()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void TransformDateInJsPatch(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         var @do = new DateOnly(2022, 2, 21);
         var to = new TimeOnly(21, 11, 00);
         var entity = new DateAndTimeOnly() {DateOnly = @do, TimeOnly = to};
@@ -126,7 +132,7 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
         operation.WaitForCompletion(TimeSpan.FromSeconds(5));
         {
             using var session = store.OpenSession();
-            WaitForUserToContinueTheTest(store);
+
             var result = session.Query<DateAndTimeOnly>().ToList();
             Assert.Null(result.Single(p => p.DateOnly == null).DateOnly);
             Assert.Equal(@do.AddDays(1), result.Single(p=> p.DateOnly != null).DateOnly);
@@ -134,10 +140,11 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
     }
 
 
-    [Fact]
-    public void PatchDateOnlyAndTimeOnly()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void PatchDateOnlyAndTimeOnly(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         var @do = new DateOnly(2022, 2, 21);
         var to = new TimeOnly(21, 11, 00);
         string id;
@@ -179,10 +186,11 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
     }
 
 
-    [Fact]
-    public void DateAndTimeOnlyInQuery()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void DateAndTimeOnlyInQuery(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
 
         var data = CreateDatabaseData(store);
         Indexes.WaitForIndexing(store);
@@ -192,7 +200,7 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
             var time = default(TimeOnly);
             var resultRawQuery = session.Query<DateAndTimeOnly>().Where(p => p.DateOnly >= date && p.TimeOnly > time);
             var result = resultRawQuery.ToList();
-            WaitForUserToContinueTheTest(store);
+
             Assert.Equal(500, result.Count);
             var definitions = store.Maintenance.Send(new GetIndexesOperation(0, 1));
             foreach (var indexDefinition in definitions)
@@ -215,10 +223,11 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
         }
     }
 
-    [Fact]
-    public void QueriesAsString()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void QueriesAsString(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         var data = CreateDatabaseData(store);
 
         {
@@ -271,10 +280,11 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
         }
     }
 
-    [Fact]
-    public void QueriesAsTicks()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void QueriesAsTicks(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         var data = CreateDatabaseData(store);
         CreateIndex<DateAndTimeOnlyIndex>(store);
 
@@ -292,14 +302,10 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
                 .OrderBy(p => p.TimeOnly)
                 .ToList();
 
-            Assert.True(
-                testData
-                    .Select(p => p.TimeOnly)
-                    .SequenceEqual(
-                        result
-                            .Select(p => p.TimeOnly)
-                    )
-            );
+            Assert.Equal(100, result.Count);
+            for (int i = 0; i < 100; ++i)
+                Assert.Equal(testData[i].TimeOnly, result[i].TimeOnly);
+            
         }
 
         {
@@ -328,10 +334,11 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
         }
     }
 
-    [Fact]
-    public void MinMaxValueInProjections()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void MinMaxValueInProjections(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         {
             using var session = store.OpenSession();
             session.Store(new ProjectionTestWithDefaultValues {Min = DateOnly.MaxValue, Max = DateOnly.MinValue, Time = DateTime.Today}
@@ -356,10 +363,11 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
         public DateTime? Time { get; set; }
     }
 
-    [Fact]
-    public void ProjectionJobsWithDateTimeDateOnly()
+    [RavenTheory(RavenTestCategory.Indexes | RavenTestCategory.Querying)]
+    [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+    public void ProjectionJobsWithDateTimeDateOnly(Options options)
     {
-        using var store = GetDocumentStore();
+        using var store = GetDocumentStore(options);
         {
             using var s = store.OpenSession();
             s.Store(new DateAndTimeOnly() {TimeOnly = TimeOnly.MaxValue, DateOnly = new DateOnly(1947, 12, 21)});
@@ -382,7 +390,7 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
     private List<DateAndTimeOnly> CreateDatabaseData(IDocumentStore store)
     {
         TimeOnly timeOnly = new TimeOnly(0, 0, 0, 234);
-        DateOnly dateOnly;
+        DateOnly dateOnly = default;
         var database =
             Enumerable.Range(0, 1000)
                 .Select(i => new DateAndTimeOnly() {TimeOnly = timeOnly.AddMinutes(i), DateOnly = dateOnly.AddDays(i), DateTime = DateTime.Now}).ToList();
@@ -404,7 +412,6 @@ from DateAndTimeOnlies where DateOnly != null update { this.DateOnly = modifyDat
         index.Execute(store);
         Indexes.WaitForIndexing(store);
         var indexErrors = store.Maintenance.Send(new GetIndexErrorsOperation(new[] {index.IndexName}));
-        WaitForUserToContinueTheTest(store);
         Assert.Equal(0, indexErrors[0].Errors.Length);
         return index;
     }

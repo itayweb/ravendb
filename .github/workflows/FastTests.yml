@@ -3,14 +3,14 @@ name: tests/fast
 on:
   push:
     branches:
-        - v5.3
+        - v5.4
 
   pull_request:
     branches:
-        - v5.3
+        - v5.4
 
 env:
-  DOTNET_VERSION: 6.0.403
+  DOTNET_VERSION: 7.0.100
   
 
 jobs:

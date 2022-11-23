@@ -18,6 +18,14 @@ class ongoingTaskRavenEtlEditModel extends ongoingTaskEditModel {
     
     validationGroup: KnockoutValidationGroup;
     dirtyFlag: () => DirtyFlag;
+
+    get studioTaskType(): StudioTaskType {
+        return "RavenEtl";
+    }
+
+    get destinationType(): TaskDestinationType {
+        return "Collection";
+    }
     
     constructor(dto: Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskRavenEtlDetails) {
         super();
@@ -145,6 +153,10 @@ class ongoingTaskRavenEtlEditModel extends ongoingTaskEditModel {
                     Name: "",
                 },
             } as Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskRavenEtlDetails);
+    }
+
+    hasAdvancedOptionsDefined(): boolean {
+        return !!this.loadRequestTimeout();
     }
 }
 

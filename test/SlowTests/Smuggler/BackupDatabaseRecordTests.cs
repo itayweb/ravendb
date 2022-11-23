@@ -16,6 +16,7 @@ using Raven.Client.Documents.Operations.ConnectionStrings;
 using Raven.Client.Documents.Operations.ETL;
 using Raven.Client.Documents.Operations.ETL.ElasticSearch;
 using Raven.Client.Documents.Operations.ETL.OLAP;
+using Raven.Client.Documents.Operations.ETL.Queue;
 using Raven.Client.Documents.Operations.ETL.SQL;
 using Raven.Client.Documents.Operations.Expiration;
 using Raven.Client.Documents.Operations.Replication;
@@ -169,7 +170,7 @@ namespace SlowTests.Smuggler
                         Name = "sql",
                         ParameterizeDeletes = false,
                         MentorNode = "A",
-                        Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } }
+                        Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } }
                     }));
                     await store1.Maintenance.SendAsync(new UpdatePeriodicBackupOperation(config));
 
@@ -373,7 +374,7 @@ namespace SlowTests.Smuggler
                         Name = "sql",
                         ParameterizeDeletes = false,
                         MentorNode = "A",
-                        Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } }
+                        Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } }
                     }));
                     var migrate = new Migrator(new DatabasesMigrationConfiguration
                     {
@@ -820,7 +821,7 @@ namespace SlowTests.Smuggler
                         ConnectionStringName = "scon1",
                         Name = "setl1",
                         AllowEtlOnNonEncryptedChannel = true,
-                        Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } },
+                        Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } },
                         SqlTables =
                         {
                             new SqlEtlTable {TableName = "Orders", DocumentIdColumn = "Id"},
@@ -833,7 +834,7 @@ namespace SlowTests.Smuggler
                         ConnectionStringName = "scon2",
                         Name = "setl2",
                         AllowEtlOnNonEncryptedChannel = true,
-                        Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } },
+                        Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } },
                         SqlTables =
                         {
                             new SqlEtlTable {TableName = "Orders", DocumentIdColumn = "Id"},
@@ -846,7 +847,7 @@ namespace SlowTests.Smuggler
                         ConnectionStringName = "scon3",
                         Name = "setl1",
                         AllowEtlOnNonEncryptedChannel = true,
-                        Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } },
+                        Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } },
                         SqlTables =
                         {
                             new SqlEtlTable {TableName = "Orders", DocumentIdColumn = "Id"},
@@ -859,7 +860,7 @@ namespace SlowTests.Smuggler
                         ConnectionStringName = "scon4",
                         Name = "setl4",
                         AllowEtlOnNonEncryptedChannel = true,
-                        Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } },
+                        Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } },
                         SqlTables =
                         {
                             new SqlEtlTable {TableName = "Orders", DocumentIdColumn = "Id"},
@@ -1113,7 +1114,7 @@ namespace SlowTests.Smuggler
                     Name = "sql",
                     ParameterizeDeletes = false,
                     MentorNode = "A",
-                    Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } }
+                    Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } }
                 }));
 
                 using (var session = store.OpenAsyncSession())
@@ -1312,6 +1313,16 @@ namespace SlowTests.Smuggler
                     Name = "elasticsearch-cs"
                 }));
 
+                await store.Maintenance.SendAsync(new PutConnectionStringOperation<QueueConnectionString>(new QueueConnectionString
+                {
+                    Name = "queue-kafka-cs",
+                    BrokerType = QueueBrokerType.Kafka,
+                    KafkaConnectionSettings = new KafkaConnectionSettings
+                    {
+                        BootstrapServers = "localhost:29092"
+                    }
+                }));
+
                 var etlConfiguration = new RavenEtlConfiguration
                 {
                     ConnectionStringName = store.Database,
@@ -1324,7 +1335,7 @@ namespace SlowTests.Smuggler
                     ConnectionStringName = "sql-cs",
                     Name = "sql-test",
                     AllowEtlOnNonEncryptedChannel = true,
-                    Transforms = new List<Transformation> { new() { Script = "", Collections = new List<string> { "Orders" }, Name = "testScript" } },
+                    Transforms = new List<Transformation> { new() { Script = "loadToOrders(this)", Collections = new List<string> { "Orders" }, Name = "testScript" } },
                     SqlTables =
                     {
                         new SqlEtlTable {TableName = "Orders", DocumentIdColumn = "Id"},
@@ -1349,6 +1360,14 @@ namespace SlowTests.Smuggler
                     Transforms = { new Transformation { Name = "loadAll", Collections = { "Orders" }, Script = "loadToOrders(this)" } }
                 };
                 await store.Maintenance.SendAsync(new AddEtlOperation<ElasticSearchConnectionString>(elasticSearchEtlConfiguration));
+
+                var queueKafkaEtlConfiguration = new QueueEtlConfiguration
+                {
+                    Name = "queue-kafka-test",
+                    ConnectionStringName = "queue-kafka-cs",
+                    Transforms = { new Transformation { Name = "loadAll", Collections = { "Orders" }, Script = "loadToOrders(this)" } }
+                };
+                await store.Maintenance.SendAsync(new AddEtlOperation<QueueConnectionString>(queueKafkaEtlConfiguration));
 
                 // external replication
                 var connectionString = new RavenConnectionString
@@ -1417,6 +1436,12 @@ namespace SlowTests.Smuggler
                             tasksCount++;
                         }
 
+                        foreach (var task in databaseRecord.QueueEtls)
+                        {
+                            Assert.Equal(disableOngoingTasks, task.Disabled);
+                            tasksCount++;
+                        }
+
                         foreach (var task in databaseRecord.PeriodicBackups)
                         {
                             Assert.Equal(disableOngoingTasks, task.Disabled);
@@ -1441,7 +1466,7 @@ namespace SlowTests.Smuggler
                             tasksCount++;
                         }
 
-                        Assert.Equal(8, tasksCount);
+                        Assert.Equal(9, tasksCount);
                     }
                 }
             }

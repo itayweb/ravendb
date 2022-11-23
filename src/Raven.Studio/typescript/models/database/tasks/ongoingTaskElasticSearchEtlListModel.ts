@@ -7,13 +7,17 @@ class ongoingTaskElasticSearchEtlListModel extends abstractOngoingTaskEtlListMod
     nodesUrls = ko.observableArray<string>([]);
     connectionStringDefined = ko.observable<boolean>(true); // needed for template in the ongoing tasks list view
 
+    get studioTaskType(): StudioTaskType {
+        return "ElasticSearchEtl";
+    }
+    
     constructor(dto: Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskElasticSearchEtlListView) {
         super();
 
         this.update(dto);
         this.initializeObservables();
 
-        this.connectionStringsUrl = appUrl.forConnectionStrings(activeDatabaseTracker.default.database(), "elasticSearch", this.connectionStringName());
+        this.connectionStringsUrl = appUrl.forConnectionStrings(activeDatabaseTracker.default.database(), "ElasticSearch", this.connectionStringName());
     }
 
     initializeObservables() {

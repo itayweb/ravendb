@@ -32,6 +32,19 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="bg-info flex-horizontal padding padding-xs" data-bind="visible: indexesToDeleteAfterMerge().length > 0, if: indexesToDeleteAfterMerge().length > 0">
+                <div class="flex-start">
+                    <small class="padding padding-sm"><i class="icon-info"></i></small>
+                </div>
+                <div>
+                    This is a suggestion for a new index that will merge the following indexes: <br /> 
+                    <span data-bind="text: indexesToDeleteAfterMerge().join(', ')"></span>.<br />
+                    Please review the index definition before saving. <br />
+                    After saving, the next dialog will list the original indexes that may be deleted.
+                </div>
+            </div>
+            
             <div class="row margin-top margin-top-lg">
                 <div class="col-sm-2">
                     <h3 class="margin-bottom margin-bottom-xs on-base-background">Index Name</h3>
@@ -255,7 +268,28 @@
                                 <span>Add customized indexing configuration</span>
                             </button>
                         </div>
-                        <hr data-bind="visible: editedIndex().numberOfConfigurationFields()">
+                        <hr class="margin-bottom">
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <div class="form-group">
+                                    <div class="flex-grow margin-left margin-left-lg">
+                                        <input class="form-control" data-bind="textInput: $root.constructor.searchEngineConfigurationLabel" disabled />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3">
+                                <div class="btn-group properties-value">
+                                    <button type="button" class="btn set-size dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                                        <span data-bind="text: effectiveSearchEngineText"></span> <i class="caret"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a href="#" data-bind="click: searchEngineConfiguration.bind(searchEngineConfiguration, null)"><span data-bind="text: inheritSearchEngineText"></span></a></li>
+                                        <li><a href="#" data-bind="click: searchEngineConfiguration.bind(searchEngineConfiguration, 'Lucene')"><span data-bind="text: $root.constructor.formatEngine('Lucene')"></span></a></li>
+                                        <li><a href="#" data-bind="click: searchEngineConfiguration.bind(searchEngineConfiguration, 'Corax')"><span data-bind="text: $root.constructor.formatEngine('Corax')"></span></a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                         <div data-bind="foreach: editedIndex().configuration">
                             <div class="row">
                                 <div class="col-lg-8" data-bind="validationElement: key">
@@ -281,10 +315,6 @@
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                        <div class="text-center text-muted" data-bind="visible: !editedIndex().numberOfConfigurationFields()">
-                            <i class="icon-lg icon-empty-set"></i>
-                            <h2 class="margin-top margin-top-sm">No customized indexing configuration added</h2>
                         </div>
                     </div>
                     <div role="tabpanel" class="tab-pane fade" id="additionalAssemblies">
@@ -557,13 +587,14 @@
                 <div class="properties-container">
                     <div class="properties-item">
                         <span class="properties-label">Store
-                            <a class="store-field-info pull-right" data-toggle="tooltip" data-bind="visible: showStoreInfo">
+                            <a class="store-field-info-lucene pull-right" data-toggle="tooltip" data-bind="visible: isStoreField() && isLucene()">
                                 <i class="icon-info text-warning"></i>
                             </a>
                         </span>
-                        <div class="btn-group properties-value" data-bind="validationElement: indexOrStore">
+                        <div class="btn-group properties-value has-disable-reason"
+                             data-bind="validationElement: indexOrStore, attr: { 'data-original-title': isCorax() ? 'Fields are always stored when search engine is Corax' : '' }">
                             <button type="button" class="btn set-size dropdown-toggle" data-toggle="dropdown" aria-expanded="false"
-                                    data-bind="css: { 'border-warning': showStoreInfo }">
+                                    data-bind="css: { 'border-warning': isStoreField() && isLucene() }, disable: isCorax()">
                                 <span data-bind="text: effectiveStorage"></span> <span class="caret"></span>
                             </button>
                             <ul class="dropdown-menu">
@@ -774,7 +805,7 @@
 
 <script type="text/html" id="index-history-dialog">
     <button class="btn btn-default dropdown-toggle" type="button" id="dropdownIndexHistory" data-toggle="dropdown"
-            data-bind="click: indexHistoryButtonHandler, attr: { title: isEditingExistingIndex() ? 'View this index history' : 'View the history of the index you cloned from' }">
+            data-bind="click: indexHistoryButtonHandler, attr: { title: isEditingExistingIndex() ? 'View this index history' : 'View the history of the index you cloned from' }, visible: !indexesToDeleteAfterMerge().length">
         <i class="icon-index-history"></i><span>Index History</span>
         <span class="caret"></span>
     </button>
@@ -798,7 +829,7 @@
                 <div class="row">
                     <div class="margin-right margin-top pull-right">
                         <div class="btn-group margin-top margin-top-sm">
-                            <button class="btn btn-success close-panel" data-bind="click: loadIndexDefinitionFromHistory" title="Load the full definition of this index revision">
+                            <button class="btn btn-success close-panel" data-bind="click: loadFullIndexDefinitionFromHistory" title="Load the full definition of this index revision">
                                 <i class="icon-load-index"></i>
                                 <span>Load Index</span>
                             </button>
@@ -808,7 +839,7 @@
                             </button>
                             <ul class="dropdown-menu dropdown-menu-right">
                                 <li title="Load the Map & Reduce methods only" class="close-panel margin-top margin-top-xs margin-bottom margin-bottom-xs">
-                                    <a href="#" data-bind="click: $root.loadMapReduceFromHistory">
+                                    <a href="#" data-bind="click: $root.loadOnlyMapAndReduceFromHistory">
                                         <i class="icon-load-map-reduce"></i><span>Load Map & Reduce Only</span>
                                     </a>
                                 </li>

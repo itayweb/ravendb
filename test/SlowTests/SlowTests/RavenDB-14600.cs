@@ -18,10 +18,11 @@ namespace SlowTests.SlowTests
         {
         }
 
-        [Fact]
-        public void CanIncludeFacetResult()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanIncludeFacetResult(Options options)
         {
-            using var store = GetDocumentStore();
+            using var store = GetDocumentStore(options);
             store.Maintenance.Send(new CreateSampleDataOperation(Raven.Client.Documents.Smuggler.DatabaseItemType.Documents | Raven.Client.Documents.Smuggler.DatabaseItemType.Indexes));
             Indexes.WaitForIndexing(store);
             using (var s = store.OpenSession())
@@ -58,14 +59,15 @@ namespace SlowTests.SlowTests
             }
         }
 
-        [Fact]
-        public void CanIncludeComplexFacetResult()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Lucene)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Corax, Skip = "Corax - complex items")]
+        public void CanIncludeComplexFacetResult(Options options)
         {
-            using var store = GetDocumentStore();
+            using var store = GetDocumentStore(options);
             store.Maintenance.Send(new CreateSampleDataOperation(Raven.Client.Documents.Smuggler.DatabaseItemType.Documents));
             new MyIndex().Execute(store);
             Indexes.WaitForIndexing(store);
-
             using (var s = store.OpenSession())
             {
                 var facets = s.Query<Order, MyIndex>()

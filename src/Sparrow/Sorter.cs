@@ -7,14 +7,14 @@ using Sparrow.Binary;
 
 namespace Sparrow
 {
-    public struct Sorter<T, TSorter>
+    public readonly struct Sorter<T, TSorter>
         where TSorter : struct, IComparer<T>
     {
         private readonly TSorter _sorter;        
 
         private const int SizeThreshold = 16;
 
-        public Sorter(TSorter sorter)
+        public Sorter(in TSorter sorter)
         {
             _sorter = sorter;
         }
@@ -52,6 +52,7 @@ namespace Sparrow
 
             ref T ka = ref keys[x];
             ref T kb = ref keys[y];
+            
             if (ka != null && _sorter.Compare(ka, kb) > 0)
             {
                 T aux = ka;
@@ -279,7 +280,7 @@ namespace Sparrow
         }
     }
 
-    public struct Sorter<T, V, TSorter>
+    public readonly struct Sorter<T, V, TSorter>
         where TSorter : struct, IComparer<T>
     {
         private readonly TSorter _sorter;

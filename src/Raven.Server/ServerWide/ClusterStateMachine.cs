@@ -423,6 +423,9 @@ namespace Raven.Server.ServerWide
                     case nameof(PutAnalyzersCommand):
                     case nameof(DeleteAnalyzerCommand):
                     case nameof(PutIndexCommand):
+                    case nameof(PutDatabaseStudioConfigurationCommand):
+                    case nameof(PutDatabaseSettingsCommand):
+                    case nameof(PutDatabaseClientConfigurationCommand):
                     case nameof(PutIndexesCommand):
                     case nameof(PutAutoIndexCommand):
                     case nameof(PutRollingIndexCommand):
@@ -446,19 +449,23 @@ namespace Raven.Server.ServerWide
                     case nameof(AddSqlEtlCommand):
                     case nameof(AddOlapEtlCommand):
                     case nameof(AddElasticSearchEtlCommand):
+                    case nameof(AddQueueEtlCommand):
                     case nameof(UpdateRavenEtlCommand):
                     case nameof(UpdateSqlEtlCommand):
                     case nameof(UpdateOlapEtlCommand):
                     case nameof(UpdateElasticSearchEtlCommand):
+                    case nameof(UpdateQueueEtlCommand):
                     case nameof(DeleteOngoingTaskCommand):
                     case nameof(PutRavenConnectionStringCommand):
                     case nameof(PutSqlConnectionStringCommand):
                     case nameof(PutOlapConnectionStringCommand):
                     case nameof(PutElasticSearchConnectionStringCommand):
+                    case nameof(PutQueueConnectionStringCommand):
                     case nameof(RemoveRavenConnectionStringCommand):
                     case nameof(RemoveSqlConnectionStringCommand):
                     case nameof(RemoveOlapConnectionStringCommand): 
                     case nameof(RemoveElasticSearchConnectionStringCommand):
+                    case nameof(RemoveQueueConnectionStringCommand):
                     case nameof(UpdatePullReplicationAsHubCommand):
                     case nameof(UpdatePullReplicationAsSinkCommand):
                     case nameof(EditDatabaseClientConfigurationCommand):
@@ -1552,7 +1559,10 @@ namespace Raven.Server.ServerWide
             nameof(DatabaseRecord.HubPullReplications),
             nameof(DatabaseRecord.RavenEtls),
             nameof(DatabaseRecord.SqlEtls),
-            nameof(DatabaseRecord.OlapEtls)
+            nameof(DatabaseRecord.OlapEtls),
+            nameof(DatabaseRecord.ElasticSearchEtls),
+            nameof(DatabaseRecord.QueueEtls)
+
         };
 
         private unsafe List<string> AddDatabase(ClusterOperationContext context, BlittableJsonReaderObject cmd, long index, Leader leader)
@@ -2452,20 +2462,27 @@ namespace Raven.Server.ServerWide
                 case nameof(AddSqlEtlCommand):
                 case nameof(AddOlapEtlCommand):
                 case nameof(AddElasticSearchEtlCommand):
+                case nameof(AddQueueEtlCommand):
                 case nameof(UpdateRavenEtlCommand):
                 case nameof(UpdateSqlEtlCommand):
                 case nameof(UpdateOlapEtlCommand):
                 case nameof(UpdateElasticSearchEtlCommand):
+                case nameof(UpdateQueueEtlCommand):
                 case nameof(DeleteOngoingTaskCommand):
                 case nameof(PutRavenConnectionStringCommand):
                 case nameof(PutSqlConnectionStringCommand):
                 case nameof(PutOlapConnectionStringCommand):
                 case nameof(PutElasticSearchConnectionStringCommand):
+                case nameof(PutQueueConnectionStringCommand):
                 case nameof(RemoveRavenConnectionStringCommand):
                 case nameof(RemoveSqlConnectionStringCommand):
                 case nameof(RemoveOlapConnectionStringCommand):
                 case nameof(RemoveElasticSearchConnectionStringCommand):
+                case nameof(RemoveQueueConnectionStringCommand):
                 case nameof(PutIndexCommand):
+                case nameof(PutDatabaseStudioConfigurationCommand):
+                case nameof(PutDatabaseSettingsCommand):
+                case nameof(PutDatabaseClientConfigurationCommand):
                 case nameof(PutAutoIndexCommand):
                 case nameof(DeleteIndexCommand):
                 case nameof(SetIndexLockCommand):

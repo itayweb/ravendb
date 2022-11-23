@@ -4,6 +4,7 @@ using Raven.Client.Documents.Commands.Batches;
 using Raven.Client.Documents.Indexes;
 using Raven.Tests.Core.Utils.Entities;
 using Sparrow.Json;
+using Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,10 +16,11 @@ namespace SlowTests.Issues
         {
         }
 
-        [Fact]
-        public void ShouldNotCreatePropertyAfterAccessingIt()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void ShouldNotCreatePropertyAfterAccessingIt(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 using (var session = store.OpenSession())
                 {
@@ -65,10 +67,12 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void ShouldNotProjectPropertyValueIfOnlyViewedStoredIndexedValue()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Lucene)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Corax, Skip = "RavenDB-19393")]
+        public void ShouldNotProjectPropertyValueIfOnlyViewedStoredIndexedValue(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new UsersIndex().Execute(store);
                 using (var session = store.OpenSession())
@@ -88,7 +92,6 @@ b:u.newField
 ",
                         WaitForNonStaleResults = true                        
                     });
-
                     var firstResult = results.Results[0] as BlittableJsonReaderObject;
 
                     Assert.Equal(-1, (firstResult["a"] as BlittableJsonReaderObject).GetPropertyIndex("newField"));
@@ -100,10 +103,12 @@ b:u.newField
         }
 
 
-        [Fact]
-        public void ShouldProjectPropertyValueIfViewedAndUpdatedStoredIndexedValue()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Lucene)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Corax, Skip = "RavenDB-19393")]
+        public void ShouldProjectPropertyValueIfViewedAndUpdatedStoredIndexedValue(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new UsersIndex().Execute(store);
                 using (var session = store.OpenSession())
@@ -138,10 +143,12 @@ b:u.newField
         }
 
 
-        [Fact]
-        public void ShouldProjectPropertyValueIfViewedAndUpdatedStoredIndexedValueShouldRespectOperationsOrder()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Lucene)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Corax, Skip = "RavenDB-19393")]
+        public void ShouldProjectPropertyValueIfViewedAndUpdatedStoredIndexedValueShouldRespectOperationsOrder(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new UsersIndex().Execute(store);
                 using (var session = store.OpenSession())
@@ -168,7 +175,7 @@ a:proj(u)
                     });
 
                     var firstResult = results.Results[0] as BlittableJsonReaderObject;
-
+                    
                     Assert.Equal("newValue2", (firstResult["a"] as BlittableJsonReaderObject)["newField"].ToString());
                     Assert.Equal("newValue", firstResult["b"].ToString());
 

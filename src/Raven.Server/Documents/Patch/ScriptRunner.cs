@@ -38,7 +38,7 @@ using Sparrow;
 using Sparrow.Extensions;
 using Sparrow.Json;
 using Sparrow.Json.Parsing;
-using Spatial4n.Core.Distance;
+using Spatial4n.Distance;
 using ExpressionType = System.Linq.Expressions.ExpressionType;
 using JavaScriptException = Jint.Runtime.JavaScriptException;
 
@@ -246,6 +246,7 @@ namespace Raven.Server.Documents.Patch
 
                 JavaScriptUtils = new JavaScriptUtils(_runner, ScriptEngine);
                 ScriptEngine.SetValue(GetMetadataMethod, new ClrFunctionInstance(ScriptEngine, GetMetadataMethod, JavaScriptUtils.GetMetadata));
+                ScriptEngine.SetValue("metadataFor", new ClrFunctionInstance(ScriptEngine, GetMetadataMethod, JavaScriptUtils.GetMetadata));
                 ScriptEngine.SetValue("id", new ClrFunctionInstance(ScriptEngine, "id", JavaScriptUtils.GetDocumentId));
 
                 ScriptEngine.SetValue("output", new ClrFunctionInstance(ScriptEngine, "output", OutputDebug));
@@ -947,7 +948,7 @@ namespace Raven.Server.Documents.Patch
 
                 var result = SpatialDistanceFieldComparatorSource.SpatialDistanceFieldComparator.HaverstineDistanceInMiles(lat1, lng1, lat2, lng2);
                 if (units == SpatialUnits.Kilometers)
-                    result *= DistanceUtils.MILES_TO_KM;
+                    result *= DistanceUtils.MilesToKilometers;
 
                 return result;
             }

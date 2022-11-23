@@ -7,6 +7,7 @@ using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Operations.Indexes;
 using Xunit;
 using Xunit.Abstractions;
+using Tests.Infrastructure;
 
 namespace SlowTests.Issues
 {
@@ -54,10 +55,11 @@ namespace SlowTests.Issues
             Indexes.WaitForIndexing(store);
         }
 
-        [Fact]
-        public async Task CanChainSuggestions()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public async Task CanChainSuggestions(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 Setup(store);
 
@@ -105,10 +107,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void CanUseAliasInSuggestions()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanUseAliasInSuggestions(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 Setup(store);
 
@@ -126,10 +129,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void CanUseSuggestionsWithAutoIndex()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanUseSuggestionsWithAutoIndex(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 Setup(store);
 
@@ -147,10 +151,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void CanExtendAutoIndexWithSuggestions()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanExtendAutoIndexWithSuggestions(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 Setup(store);
 

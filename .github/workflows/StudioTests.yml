@@ -3,11 +3,13 @@ name: tests/studio
 on:
   push:
     branches:
-        - v5.3
+        - feature/*
+        - v5.4
 
   pull_request:
     branches:
-        - v5.3
+        - feature/*
+        - v5.4
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +19,7 @@ jobs:
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '6.0'
+        dotnet-version: '7.0'
 
     - name: Install dependencies
       run: dotnet restore

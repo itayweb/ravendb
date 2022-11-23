@@ -6,7 +6,11 @@
         VariableSizeTree = 1,
         EmbeddedFixedSizeTree = 2,
         FixedSizeTree = 3,
-        PrefixTree = 4,
+        ObsoleteValue = 4, // used to be PrefixTree, never used in prod 
         Table = 5,
+        CompactTree = 6,
+        Set = 7,
+        Container = 8,
+        PersistentDictionary = 9
     }
 }

@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Nest;
 using Raven.Client.Documents.Indexes;
 using Raven.Server.Documents.Includes;
+using Raven.Server.Documents.Indexes.Persistence;
 using Raven.Server.Documents.Indexes.Persistence.Lucene;
 using Raven.Server.Documents.Indexes.Workers;
 using Raven.Server.Documents.Queries;
@@ -43,15 +46,82 @@ namespace Raven.Server.Documents.Indexes
             return _filters;
         }
 
-        public override void HandleDelete(Tombstone tombstone, string collection, Lazy<IndexWriteOperation> writer, TransactionOperationContext indexContext, IndexingStatsScope stats)
+        public override void HandleDelete(Tombstone tombstone, string collection, Lazy<IndexWriteOperationBase> writer, TransactionOperationContext indexContext, IndexingStatsScope stats)
         {
             writer.Value.Delete(tombstone.LowerId, stats);
         }
 
-        public override int HandleMap(IndexItem indexItem, IEnumerable mapResults, Lazy<IndexWriteOperation> writer, TransactionOperationContext indexContext, IndexingStatsScope stats)
+        public override int HandleMap(IndexItem indexItem, IEnumerable mapResults, Lazy<IndexWriteOperationBase> writer, TransactionOperationContext indexContext, IndexingStatsScope stats)
         {
             EnsureValidStats(stats);
 
+            int numberOfOutputs;
+            if (SearchEngineType == SearchEngineType.Lucene)
+            {
+                numberOfOutputs = UpdateIndexEntriesLucene(indexItem, mapResults, writer, indexContext, stats);
+            }
+            else if(SearchEngineType == SearchEngineType.Corax)
+            {
+                numberOfOutputs = UpdateIndexEntriesCorax(indexItem, mapResults, writer, indexContext, stats);
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(SearchEngineType), SearchEngineType + " is not a supported value");
+            }
+
+
+            HandleIndexOutputsPerDocument(indexItem.Id ?? indexItem.LowerId, numberOfOutputs, stats);
+            HandleSourceDocumentIncludedInMapOutput();
+            
+            DocumentDatabase.Metrics.MapIndexes.IndexedPerSec.Mark(numberOfOutputs);
+
+            return numberOfOutputs;
+        }
+
+        private int UpdateIndexEntriesCorax(IndexItem indexItem, IEnumerable mapResults, Lazy<IndexWriteOperationBase> writer, TransactionOperationContext indexContext, IndexingStatsScope stats)
+        {
+            var it = mapResults.GetEnumerator();
+            try
+            {
+                if (it.MoveNext() == false)
+                {
+                    writer.Value.Delete(indexItem.LowerId, stats);
+                    return 0; // no results at all
+                }
+
+                var first = it.Current;
+
+                if (it.MoveNext() == false)
+                {
+                    // we have just _one_ entry for the map, can try to optimize
+                    writer.Value.UpdateDocument(Raven.Client.Constants.Documents.Indexing.Fields.DocumentIdFieldName,
+                        indexItem.LowerId, indexItem.LowerSourceDocumentId, first, stats, indexContext);
+                    return 1;
+                }
+                else
+                {
+                    writer.Value.Delete(indexItem.LowerId, stats);
+                    writer.Value.IndexDocument(indexItem.LowerId, indexItem.LowerSourceDocumentId, first, stats, indexContext);
+                    var numberOfOutputs = 1; // the first
+                    do
+                    {
+                        numberOfOutputs++;
+                        writer.Value.IndexDocument(indexItem.LowerId, indexItem.LowerSourceDocumentId, it.Current, stats, indexContext);
+                    } while (it.MoveNext());
+
+                    return numberOfOutputs;
+                }
+
+            }
+            finally
+            {
+                if(it is IDisposable d)
+                    d.Dispose();
+            }
+        }
+
+        private int UpdateIndexEntriesLucene(IndexItem indexItem, IEnumerable mapResults, Lazy<IndexWriteOperationBase> writer, TransactionOperationContext indexContext, IndexingStatsScope stats)
+        {
             bool mustDelete;
             using (_stats.BloomStats.Start())
             {
@@ -69,17 +139,12 @@ namespace Raven.Server.Documents.Indexes
                 numberOfOutputs++;
             }
 
-            HandleIndexOutputsPerDocument(indexItem.Id ?? indexItem.LowerId, numberOfOutputs, stats);
-            HandleSourceDocumentIncludedInMapOutput();
-            
-            DocumentDatabase.Metrics.MapIndexes.IndexedPerSec.Mark(numberOfOutputs);
-
             return numberOfOutputs;
         }
 
-        public override IQueryResultRetriever GetQueryResultRetriever(IndexQueryServerSide query, QueryTimingsScope queryTimings, DocumentsOperationContext documentsContext, FieldsToFetch fieldsToFetch, IncludeDocumentsCommand includeDocumentsCommand, IncludeCompareExchangeValuesCommand includeCompareExchangeValuesCommand, IncludeRevisionsCommand includeRevisionsCommand)
+        public override IQueryResultRetriever GetQueryResultRetriever(IndexQueryServerSide query, QueryTimingsScope queryTimings, DocumentsOperationContext documentsContext, SearchEngineType searchEngineType, FieldsToFetch fieldsToFetch, IncludeDocumentsCommand includeDocumentsCommand, IncludeCompareExchangeValuesCommand includeCompareExchangeValuesCommand, IncludeRevisionsCommand includeRevisionsCommand)
         {
-            return new MapQueryResultRetriever(DocumentDatabase, query, queryTimings, DocumentDatabase.DocumentsStorage, documentsContext, fieldsToFetch, includeDocumentsCommand, includeCompareExchangeValuesCommand,includeRevisionsCommand: includeRevisionsCommand);
+            return new MapQueryResultRetriever(DocumentDatabase, query, queryTimings, DocumentDatabase.DocumentsStorage, documentsContext, searchEngineType, fieldsToFetch, includeDocumentsCommand, includeCompareExchangeValuesCommand,includeRevisionsCommand: includeRevisionsCommand);
         }
 
         public override void SaveLastState()

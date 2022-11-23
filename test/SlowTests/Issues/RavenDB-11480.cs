@@ -5,6 +5,7 @@ using Orders;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Queries;
+using Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -76,10 +77,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void CanLoadOnStoredField()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanLoadOnStoredField(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new Index1().Execute(store);
 
@@ -113,10 +115,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void IndexWithDynamicFieldsShouldNotTryToExtractBySourceAliasIfFieldIsMissing()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void IndexWithDynamicFieldsShouldNotTryToExtractBySourceAliasIfFieldIsMissing(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new Index2().Execute(store);
 
@@ -131,10 +134,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void IndexWithDynamicFieldsShouldNotTryToExtractBySourceAliasIfFieldIsNotStored()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void IndexWithDynamicFieldsShouldNotTryToExtractBySourceAliasIfFieldIsNotStored(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new Index3().Execute(store);
 

@@ -145,7 +145,7 @@ class sqlTaskTestMode {
                 Connection: this.connectionProvider()
             } as Raven.Server.Documents.ETL.Providers.SQL.RelationalWriters.TestSqlEtlScript;
 
-            eventsCollector.default.reportEvent("sql-etl", "test-replication");
+            eventsCollector.default.reportEvent("sql-etl", "test-script");
             
             new testSqlReplicationCommand(this.db(), dto)
                 .execute()
@@ -218,7 +218,7 @@ class editSqlEtlTask extends viewModelBase {
     constructor() {
         super();
         this.bindToCurrentInstance("useConnectionString",
-                                   "testConnection",
+                                   "onTestConnectionSql",
                                    "removeTransformationScript",
                                    "cancelEditedTransformation",
                                    "cancelEditedSqlTable",
@@ -301,8 +301,12 @@ class editSqlEtlTask extends viewModelBase {
     }
 
     private initObservables() {
+        const model = this.editedSqlEtl();
+        
+        this.showAdvancedOptions(model.hasAdvancedOptionsDefined());
+        
         // Discard test connection result when connection string has changed
-        this.editedSqlEtl().connectionStringName.subscribe(() => this.testConnectionResult(null));
+        model.connectionStringName.subscribe(() => this.testConnectionResult(null));
 
         this.shortErrorText = ko.pureComputed(() => {
             const result = this.testConnectionResult();
@@ -322,7 +326,7 @@ class editSqlEtlTask extends viewModelBase {
         this.newConnectionString(connectionStringSqlEtlModel.empty());
         this.newConnectionString().setNameUniquenessValidator(name => !this.sqlEtlConnectionStringsNames().find(x => x.toLocaleLowerCase() === name.toLocaleLowerCase()));
 
-        const connectionStringName = this.editedSqlEtl().connectionStringName();
+        const connectionStringName = model.connectionStringName();
         const connectionStringIsMissing = connectionStringName && !this.sqlEtlConnectionStringsNames()
             .find(x => x.toLocaleLowerCase() === connectionStringName.toLocaleLowerCase());
         
@@ -333,15 +337,19 @@ class editSqlEtlTask extends viewModelBase {
         if (connectionStringIsMissing) {
             // looks like user imported data w/o connection strings, prefill form with desired name
             this.newConnectionString().connectionStringName(connectionStringName);
-            this.editedSqlEtl().connectionStringName(null);
+            model.connectionStringName(null);
         }
+
+        // Discard test connection result when needed
+        this.createNewConnectionString.subscribe(() => this.testConnectionResult(null));
+        this.newConnectionString().factoryName.subscribe(() => this.testConnectionResult(null));
+        this.newConnectionString().connectionString.subscribe(() => this.testConnectionResult(null));
         
         this.connectionStringDefined = ko.pureComputed(() => {
-            const editedEtl = this.editedSqlEtl();
             if (this.createNewConnectionString()) {
                 return !!this.newConnectionString().connectionString();
             } else {
-                return !!editedEtl.connectionStringName();
+                return !!model.connectionStringName();
             }
         });
         
@@ -350,7 +358,7 @@ class editSqlEtlTask extends viewModelBase {
         });
 
         const dtoProvider = () => {
-            const dto = this.editedSqlEtl().toDto();
+            const dto = model.toDto();
 
             // override transforms - use only current transformation
             const transformationScriptDto = this.editedTransformationScriptSandbox().toDto();
@@ -383,7 +391,7 @@ class editSqlEtlTask extends viewModelBase {
                     // by closing we let user know that connection string is required
                     this.enableTestArea(false);
                     // run global validation - to show connection string errors
-                    this.isValid(this.editedSqlEtl().validationGroup);
+                    this.isValid(model.validationGroup);
                     
                     return false;
                 }
@@ -444,7 +452,7 @@ class editSqlEtlTask extends viewModelBase {
         this.editedSqlEtl().connectionStringName(connectionStringToUse);
     }
 
-    testConnection() {
+    onTestConnectionSql() {
         eventsCollector.default.reportEvent("SQL-ETL-connection-string", "test-connection");
         this.spinners.test(true);
         this.testConnectionResult(null);

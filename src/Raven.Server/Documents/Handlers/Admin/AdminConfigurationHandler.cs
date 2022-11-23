@@ -12,6 +12,7 @@ using Raven.Server.Config;
 using Raven.Server.Json;
 using Raven.Server.Routing;
 using Raven.Server.ServerWide;
+using Raven.Server.ServerWide.Commands;
 using Raven.Server.ServerWide.Context;
 using Raven.Server.Utils;
 using Sparrow.Json;
@@ -91,7 +92,7 @@ namespace Raven.Server.Documents.Handlers.Admin
             {
                 var databaseSettingsJson = await context.ReadForDiskAsync(RequestBodyStream(), Constants.DatabaseSettings.StudioId);
 
-                Dictionary<string, string> settings = new Dictionary<string, string>();
+                var settings = new Dictionary<string, string>();
                 var prop = new BlittableJsonReaderObject.PropertyDetails();
 
                 for (int i = 0; i < databaseSettingsJson.Count; i++)
@@ -99,8 +100,11 @@ namespace Raven.Server.Documents.Handlers.Admin
                     databaseSettingsJson.GetPropertyByIndex(i, ref prop);
                     settings.Add(prop.Name, prop.Value?.ToString());
                 }
+                
+                var command = new PutDatabaseSettingsCommand(settings, Database.Name, GetRaftRequestIdFromQuery());
 
-                await UpdateDatabaseRecord(context, (record, _) => record.Settings = settings, GetRaftRequestIdFromQuery());
+                long index = (await Server.ServerStore.SendToLeaderAsync(command)).Index;
+                await Database.RachisLogIndexNotifications.WaitForIndexNotification(index, ServerStore.Engine.OperationTimeout);
             }
 
             NoContentStatus(HttpStatusCode.Created);
@@ -116,10 +120,10 @@ namespace Raven.Server.Documents.Handlers.Admin
                 var studioConfigurationJson = await context.ReadForMemoryAsync(RequestBodyStream(), Constants.Configuration.StudioId);
                 var studioConfiguration = JsonDeserializationServer.StudioConfiguration(studioConfigurationJson);
 
-                await UpdateDatabaseRecord(context, (record, _) =>
-                {
-                    record.Studio = studioConfiguration;
-                }, GetRaftRequestIdFromQuery());
+                var command = new PutDatabaseStudioConfigurationCommand(studioConfiguration, Database.Name, GetRaftRequestIdFromQuery());
+
+                long index = (await Server.ServerStore.SendToLeaderAsync(command)).Index;
+                await Database.RachisLogIndexNotifications.WaitForIndexNotification(index, ServerStore.Engine.OperationTimeout);
             }
 
             NoContentStatus(HttpStatusCode.Created);
@@ -135,11 +139,10 @@ namespace Raven.Server.Documents.Handlers.Admin
                 var clientConfigurationJson = await context.ReadForMemoryAsync(RequestBodyStream(), Constants.Configuration.ClientId);
                 var clientConfiguration = JsonDeserializationServer.ClientConfiguration(clientConfigurationJson);
 
-                await UpdateDatabaseRecord(context, (record, index) =>
-                {
-                    record.Client = clientConfiguration;
-                    record.Client.Etag = index;
-                }, GetRaftRequestIdFromQuery());
+                var command = new PutDatabaseClientConfigurationCommand(clientConfiguration, Database.Name, GetRaftRequestIdFromQuery());
+
+                long index = (await Server.ServerStore.SendToLeaderAsync(command)).Index;
+                await Database.RachisLogIndexNotifications.WaitForIndexNotification(index, ServerStore.Engine.OperationTimeout);
             }
 
             NoContentStatus(HttpStatusCode.Created);
@@ -187,22 +190,5 @@ namespace Raven.Server.Documents.Handlers.Admin
             }
         }
 
-        private async Task UpdateDatabaseRecord(TransactionOperationContext context, Action<DatabaseRecord, long> action, string raftRequestId)
-        {
-            if (context == null)
-                throw new ArgumentNullException(nameof(context));
-            if (action == null)
-                throw new ArgumentNullException(nameof(action));
-
-            using (context.OpenReadTransaction())
-            {
-                var record = ServerStore.Cluster.ReadDatabase(context, Database.Name, out long index);
-
-                action(record, index);
-
-                var result = await ServerStore.WriteDatabaseRecordAsync(Database.Name, record, index, raftRequestId);
-                await Database.RachisLogIndexNotifications.WaitForIndexNotification(result.Index, ServerStore.Engine.OperationTimeout);
-            }
-        }
     }
 }

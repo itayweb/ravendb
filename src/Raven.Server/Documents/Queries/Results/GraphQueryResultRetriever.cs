@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Lucene.Net.Store;
 using Raven.Client;
+using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Queries;
 using Raven.Client.Exceptions;
 using Raven.Server.Documents.Includes;
@@ -30,7 +31,7 @@ namespace Raven.Server.Documents.Queries.Results
             IncludeDocumentsCommand includeDocumentsCommand,
             IncludeCompareExchangeValuesCommand includeCompareExchangeValuesCommand,
             IncludeRevisionsCommand includeRevisionsCommand)
-            : base(database, query, queryTimings, fieldsToFetch, documentsStorage, context, false, includeDocumentsCommand, includeCompareExchangeValuesCommand, includeRevisionsCommand)
+            : base(database, query, queryTimings, SearchEngineType.Lucene, fieldsToFetch, documentsStorage, context, false, includeDocumentsCommand, includeCompareExchangeValuesCommand, includeRevisionsCommand)
         {
             _graphQuery = graphQuery;
             _context = context;
@@ -46,17 +47,17 @@ namespace Raven.Server.Documents.Queries.Results
             throw new InvalidQueryException($"Invalid projection behavior '{_query.ProjectionBehavior}'.Only default projection behavior can be used for graph queries.", _query.Query, _query.QueryParameters);
         }
 
-        public override (Document Document, List<Document> List) Get(Lucene.Net.Documents.Document input, Lucene.Net.Search.ScoreDoc scoreDoc, IState state, CancellationToken token)
+        public override (Document Document, List<Document> List) Get(ref RetrieverInput retrieverInput, CancellationToken token)
         {
             throw new NotSupportedException("Graph Queries do not deal with Lucene indexes.");
         }
 
-        public override bool TryGetKey(Lucene.Net.Documents.Document document, IState state, out string key)
+        public override bool TryGetKey(ref RetrieverInput retrieverInput, out string key)
         {
             throw new NotSupportedException("Graph Queries do not deal with Lucene indexes.");
         }
 
-        public override Document DirectGet(Lucene.Net.Documents.Document input, string id, DocumentFields fields, IState state) => DocumentsStorage.Get(_context, id);
+        public override Document DirectGet(ref RetrieverInput retrieverInput, string id, DocumentFields fields) => DocumentsStorage.Get(_context, id);
 
         protected override Document LoadDocument(string id) => DocumentsStorage.Get(_context, id);
 
@@ -132,12 +133,12 @@ namespace Raven.Server.Documents.Queries.Results
                 else
                 {
                     var val = match.GetResult(fieldToFetch.QueryField.ExpressionField.Compound[0].Value);
-
+                    var retriverInput = new RetrieverInput(null, null, null);
                     switch (val)
                     {
                         case Document d:
                             {
-                                if (TryGetValue(fieldToFetch, d, null, null, null, null, out key, out fieldVal, token) == false)
+                                if (TryGetValue(fieldToFetch, d, ref retriverInput, null, null, out key, out fieldVal, token) == false)
                                     continue;
                                 d.EnsureMetadata();
                                 var immediateResult = AddProjectionToResult(d, OneScore, FieldsToFetch, result, key, fieldVal);
@@ -148,7 +149,7 @@ namespace Raven.Server.Documents.Queries.Results
                         case BlittableJsonReaderObject bjro:
                             {
                                 var doc = new Document { Data = bjro };
-                                if (TryGetValue(fieldToFetch, doc, null, null, null, null, out key, out fieldVal, token) == false)
+                                if (TryGetValue(fieldToFetch, doc, ref retriverInput, null, null, out key, out fieldVal, token) == false)
                                     continue;
                                 doc.EnsureMetadata();
                                 var immediateResult = AddProjectionToResult(doc, OneScore, FieldsToFetch, result, key, fieldVal);
@@ -170,7 +171,7 @@ namespace Raven.Server.Documents.Queries.Results
 
                                 var doc = new Document { Data = matchJson };
 
-                                if (TryGetValue(fieldToFetch, doc, null, null, null, null, out key, out fieldVal, token) == false)
+                                if (TryGetValue(fieldToFetch, doc, ref retriverInput, null, null, out key, out fieldVal, token) == false)
                                     continue;
                                 doc.EnsureMetadata();
                                 if (ReferenceEquals(doc, fieldVal))

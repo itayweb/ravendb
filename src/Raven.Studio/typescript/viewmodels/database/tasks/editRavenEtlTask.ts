@@ -137,6 +137,8 @@ class ravenTaskTestMode {
                 Configuration: this.configurationProvider()
             };
 
+            eventsCollector.default.reportEvent("ravendb-etl", "test-script");
+
             new testRavenEtlCommand(this.db(), dto)
                 .execute()
                 .done(simulationResult => {
@@ -270,6 +272,10 @@ class editRavenEtlTask extends viewModelBase {
     }
 
     private initObservables() {
+        const model = this.editedRavenEtl();
+        
+        this.showAdvancedOptions(model.hasAdvancedOptionsDefined());
+        
         this.shortErrorText = ko.pureComputed(() => {
             const result = this.testConnectionResult();
             if (!result || result.Success) {
@@ -281,7 +287,7 @@ class editRavenEtlTask extends viewModelBase {
         this.newConnectionString(connectionStringRavenEtlModel.empty());
         this.newConnectionString().setNameUniquenessValidator(name => !this.ravenEtlConnectionStringsDetails().find(x => x.Name.toLocaleLowerCase() === name.toLocaleLowerCase()));
         
-        const connectionStringName = this.editedRavenEtl().connectionStringName();
+        const connectionStringName = model.connectionStringName();
         const connectionStringIsMissing = connectionStringName && !this.ravenEtlConnectionStringsDetails()
             .find(x => x.Name.toLocaleLowerCase() === connectionStringName.toLocaleLowerCase());
 
@@ -292,7 +298,7 @@ class editRavenEtlTask extends viewModelBase {
         if (connectionStringIsMissing) {
             // looks like user imported data w/o connection strings, prefill form with desired name
             this.newConnectionString().connectionStringName(connectionStringName);
-            this.editedRavenEtl().connectionStringName(null);
+            model.connectionStringName(null);
         }
         
         // Discard test connection result when needed
@@ -305,10 +311,10 @@ class editRavenEtlTask extends viewModelBase {
         });
 
         const dtoProvider = () => {
-            const dto = this.editedRavenEtl().toDto();
+            const dto = model.toDto();
 
             // override transforms - use only current transformation
-            const transformationScriptDto = this.editedRavenEtl().editedTransformationScriptSandbox().toDto();
+            const transformationScriptDto = model.editedTransformationScriptSandbox().toDto();
             transformationScriptDto.Name = "Script_1"; // assign fake name
             dto.Transforms = [transformationScriptDto];
 
@@ -319,13 +325,13 @@ class editRavenEtlTask extends viewModelBase {
         };
         
         this.test = new ravenTaskTestMode(this.activeDatabase, () => {
-            return this.isValid(this.editedRavenEtl().editedTransformationScriptSandbox().validationGroup);
+            return this.isValid(model.editedTransformationScriptSandbox().validationGroup);
         }, dtoProvider);
 
         this.dirtyFlag = new ko.DirtyFlag([
             this.createNewConnectionString,
             this.newConnectionString().dirtyFlag().isDirty,
-            this.editedRavenEtl().dirtyFlag().isDirty
+            model.dirtyFlag().isDirty
         ], false, jsonUtil.newLineNormalizingHashFunction);
         
         this.test.initObservables();

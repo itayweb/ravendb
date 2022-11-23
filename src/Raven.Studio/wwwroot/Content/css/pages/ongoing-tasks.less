@@ -1,4 +1,12 @@
 ﻿.manage-ongoing-tasks {
+    position: relative !important;
+
+    .database-group-topology {
+        @media (min-width: 1600px) {
+            position: sticky;
+            top: @gutter;
+        }
+    }
 
     ul.properties {
         li {
@@ -128,6 +136,14 @@
 
     &.elastic-etl {
         color: @elastic-etl-color;
+    }
+
+    &.kafka-etl {
+        color: @kafka-etl-color;
+    }
+
+    &.rabbitmq-etl {
+        color: @rabbitmq-etl-color;
     }
 
     &.subscription {

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Queries.Facets;
+using Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,7 +16,7 @@ namespace SlowTests.Bugs.Facets
         {
         }
 
-        [Fact]
+        [RavenFact(RavenTestCategory.Facets)]
         public void ManualCheck()
         {
             var now = DateTime.Today;
@@ -75,8 +76,9 @@ namespace SlowTests.Bugs.Facets
             }
         }
 
-        [Fact]
-        public void PrestonThinksDateRangeQueryShouldProduceCorrectResultsWhenBuiltWithClient()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void PrestonThinksDateRangeQueryShouldProduceCorrectResultsWhenBuiltWithClient(Options options)
         {
             var cameras = GetCameras(30);
             var now = DateTime.Today;
@@ -95,7 +97,7 @@ namespace SlowTests.Bugs.Facets
                 now.AddDays(7)
             };
 
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 CreateCameraCostIndex(store);
 

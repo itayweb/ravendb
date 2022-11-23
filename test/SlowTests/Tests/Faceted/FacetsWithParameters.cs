@@ -7,6 +7,7 @@ using FastTests;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Queries.Facets;
+using Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -67,10 +68,11 @@ namespace SlowTests.Tests.Faceted
         }
 
 
-        [Fact]
-        public void FacetShouldUseParameters_WithFacetBaseList()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void FacetShouldUseParameters_WithFacetBaseList(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 
@@ -110,10 +112,11 @@ namespace SlowTests.Tests.Faceted
         }
 
 
-        [Fact]
-        public void FacetShouldUseParameters_WithTypedRangeFacetList()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void FacetShouldUseParameters_WithTypedRangeFacetList(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 
@@ -152,10 +155,11 @@ namespace SlowTests.Tests.Faceted
             }
         }
 
-        [Fact]
-        public void FacetShouldUseParameters_WithIFacetBuilder()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void FacetShouldUseParameters_WithIFacetBuilder(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 
@@ -186,10 +190,11 @@ namespace SlowTests.Tests.Faceted
             }
         }
 
-        [Fact]
-        public void FacetShouldUseParameters_WithUntypedRangeFacetList()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void FacetShouldUseParameters_WithUntypedRangeFacetList(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
                 var now = DateTime.Now;
@@ -229,10 +234,11 @@ namespace SlowTests.Tests.Faceted
             }
         }
 
-        [Fact]
-        public void FacetSetupDocument_ShouldNotUseParameters()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void FacetSetupDocument_ShouldNotUseParameters(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 
@@ -303,10 +309,11 @@ namespace SlowTests.Tests.Faceted
             }
         }
 
-        [Fact]
-        public async Task TwoDifferentAsyncQueriesThatAreUsingTheSameFacetWithParametersShouldWork()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public async Task TwoDifferentAsyncQueriesThatAreUsingTheSameFacetWithParametersShouldWork(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 
@@ -355,10 +362,11 @@ namespace SlowTests.Tests.Faceted
             }
         }
 
-        [Fact]
-        public void QueryUsingMultipuleFacetsWithParametersShouldWork()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void QueryUsingMultipuleFacetsWithParametersShouldWork(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 
@@ -420,10 +428,11 @@ namespace SlowTests.Tests.Faceted
             }
         }
 
-        [Fact]
-        public void FacetShouldUseParameters_WithNumbers()
+        [RavenTheory(RavenTestCategory.Facets)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void FacetShouldUseParameters_WithNumbers(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 new FooIndex().Execute(store);
 

@@ -146,6 +146,11 @@ namespace Raven.Client
             {
             }
 
+            internal class Indexes
+            {
+                internal const string IndexingStaticSearchEngineType = "Indexing.Static.SearchEngineType";
+            }
+            
             public const string ClientId = "Configuration/Client";
 
             public const string StudioId = "Configuration/Studio";
@@ -447,6 +452,15 @@ namespace Raven.Client
 
                 public const string DestinationDocumentChangeVector = null;
             }
+        }
+
+        internal class Obsolete
+        {
+            private Obsolete()
+            {
+            }
+
+            public const string GraphApi = "Graph API will be removed in next major version of the product.";
         }
     }
 }

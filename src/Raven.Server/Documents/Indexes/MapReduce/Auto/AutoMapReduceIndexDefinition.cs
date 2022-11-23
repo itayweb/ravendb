@@ -4,6 +4,7 @@ using System.Linq;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Extensions;
 using Raven.Server.Documents.Indexes.Auto;
+using Raven.Server.Utils;
 using Sparrow.Json;
 using Sparrow.Server.Json.Sync;
 using Voron;
@@ -27,6 +28,8 @@ namespace Raven.Server.Documents.Indexes.MapReduce.Auto
 
             MapAndGroupByFields = new Dictionary<string, AutoIndexField>(MapFields.Count + GroupByFields.Count);
 
+            var lastUsedId = new Reference<int>() { Value = MapFields.Count + GroupByFields.Count };
+            
             foreach (var field in MapFields)
             {
                 MapAndGroupByFields[field.Key] = field.Value.As<AutoIndexField>();
@@ -36,7 +39,7 @@ namespace Raven.Server.Documents.Indexes.MapReduce.Auto
             {
                 MapAndGroupByFields[field.Key] = field.Value;
 
-                foreach (var indexField in field.Value.ToIndexFields())
+                foreach (var indexField in field.Value.ToIndexFields(lastUsedId))
                 {
                     IndexFields.Add(indexField.Name, indexField);
                 }
@@ -119,6 +122,8 @@ namespace Raven.Server.Documents.Indexes.MapReduce.Auto
                 writer.WritePropertyName(nameof(field.HasQuotedName));
                 writer.WriteBool(field.HasQuotedName);
 
+                writer.WriteComma();
+                
                 writer.WriteEndObject();
 
                 first = false;
@@ -205,19 +210,26 @@ namespace Raven.Server.Documents.Indexes.MapReduce.Auto
                 json.TryGet(nameof(AutoIndexField.Name), out string name);
                 json.TryGet(nameof(AutoIndexField.Aggregation), out int aggregationAsInt);
                 json.TryGet(nameof(AutoIndexField.HasQuotedName), out bool hasQuotedName);
-
+                
                 var field = new AutoIndexField
                 {
                     Name = name,
                     Storage = FieldStorage.No,
                     Indexing = AutoFieldIndexing.Default,
                     Aggregation = (AggregationOperation)aggregationAsInt,
-                    HasQuotedName = hasQuotedName
+                    HasQuotedName = hasQuotedName,
                 };
 
                 mapFields[i] = field;
             }
 
+            int fieldId = 1;
+            foreach (var field in mapFields.OrderBy(x => x.Name, StringComparer.Ordinal))
+            {
+                field.Id = fieldId++;
+            }
+
+            
             if (reader.TryGet(nameof(GroupByFields), out jsonArray) == false)
                 throw new InvalidOperationException("No persisted group by fields");
 
@@ -231,19 +243,24 @@ namespace Raven.Server.Documents.Indexes.MapReduce.Auto
                 json.TryGet(nameof(IndexField.Indexing), out string indexing);
                 json.TryGet(nameof(AutoIndexField.GroupByArrayBehavior), out string groupByArray);
                 json.TryGet(nameof(AutoIndexField.HasQuotedName), out bool hasQuotedName);
-
+                
                 var field = new AutoIndexField
                 {
                     Name = name,
                     Storage = FieldStorage.No,
                     Indexing = (AutoFieldIndexing)Enum.Parse(typeof(AutoFieldIndexing), indexing),
                     GroupByArrayBehavior = (GroupByArrayBehavior)Enum.Parse(typeof(GroupByArrayBehavior), groupByArray),
-                    HasQuotedName = hasQuotedName
+                    HasQuotedName = hasQuotedName,
                 };
 
                 groupByFields[i] = field;
             }
 
+            foreach (var field in groupByFields.OrderBy(x => x.Name, StringComparer.Ordinal))
+            {
+                field.Id = fieldId++;
+            }
+            
             return new AutoMapReduceIndexDefinition(collection, mapFields, groupByFields, deploymentMode: null, version)
             {
                 LockMode = lockMode,

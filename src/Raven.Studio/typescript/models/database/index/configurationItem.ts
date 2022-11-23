@@ -2,38 +2,51 @@
 import jsonUtil = require("common/jsonUtil");
 
 class configurationItem {
-
     static readonly PerDatabaseIndexingConfigurationOptions: Array<string> = [
         "Indexing.Analyzers.Default",
         "Indexing.Analyzers.Exact.Default",
-        "Indexing.Analyzers.NGram.MaxGram",
-        "Indexing.Analyzers.NGram.MinGram",
+        "Indexing.Analyzers.Lucene.NGram.MaxGram",
+        "Indexing.Analyzers.Lucene.NGram.MinGram",
         "Indexing.Analyzers.Search.Default",
         "Indexing.QueryClauseCache.Disabled",
         "Indexing.QueryClauseCache.RepeatedQueriesTimeFrameInSec",
         "Indexing.Encrypted.TransactionSizeLimitInMb",
         "Indexing.IndexEmptyEntries",
         "Indexing.IndexMissingFieldsAsNull",
-        "Indexing.LargeSegmentSizeToMergeInMb",
+        "Indexing.Lucene.LargeSegmentSizeToMergeInMb",
         "Indexing.ManagedAllocationsBatchSizeLimitInMb",
         "Indexing.MapBatchSize",
         "Indexing.MapTimeoutAfterEtagReachedInMin",
         "Indexing.MapTimeoutInSec",
-        "Indexing.MaximumSizePerSegmentInMb",
+        "Indexing.Lucene.MaximumSizePerSegmentInMb",
         "Indexing.MaxStepsForScript",
         "Indexing.MaxTimeForDocumentTransactionToRemainOpenInSec",
-        "Indexing.MaxTimeForMergesToKeepRunningInSec",
-        "Indexing.MergeFactor",
+        "Indexing.Lucene.MaxTimeForMergesToKeepRunningInSec",
+        "Indexing.Lucene.MergeFactor",
         "Indexing.Metrics.Enabled",
         "Indexing.MinNumberOfMapAttemptsAfterWhichBatchWillBeCanceledIfRunningLowOnMemory",
         "Indexing.NumberOfConcurrentStoppedBatchesIfRunningLowOnMemory",
-        "Indexing.NumberOfLargeSegmentsToMergeInSingleBatch",
+        "Indexing.Lucene.NumberOfLargeSegmentsToMergeInSingleBatch",
         "Indexing.ScratchSpaceLimitInMb",
         "Indexing.Throttling.TimeIntervalInMs",
         "Indexing.TimeSinceLastQueryAfterWhichDeepCleanupCanBeExecutedInMin",
-        "Indexing.TransactionSizeLimitInMb"
+        "Indexing.TransactionSizeLimitInMb",
+        "Indexing.OrderByScoreAutomaticallyWhenBoostingIsInvolved",
+        "Indexing.Lucene.UseCompoundFileInMerging",
+        "Indexing.Lucene.IndexInputType"
+        // "Indexing.Static.SearchEngineType" - ignoring as we have dedicated widget to set that
+        /*
+            Obsolete keys:
+                "Indexing.Analyzers.NGram.MaxGram",
+                "Indexing.Analyzers.NGram.MinGram",
+                "Indexing.LargeSegmentSizeToMergeInMb",
+                "Indexing.MaximumSizePerSegmentInMb",
+                "Indexing.MaxTimeForMergesToKeepRunningInSec",
+                "Indexing.MergeFactor",
+                "Indexing.NumberOfLargeSegmentsToMergeInSingleBatch",
+         */
     ];
-    
+
     key = ko.observable<string>();
     value = ko.observable<string>();
 

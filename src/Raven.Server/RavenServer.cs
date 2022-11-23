@@ -548,7 +548,8 @@ namespace Raven.Server
             {
                 try
                 {
-                    var (overallMachineCpuUsage, _, _) = MetricCacher.GetValue(Raven.Server.Utils.MetricCacher.Keys.Server.CpuUsage, CpuUsageCalculator.Calculate);
+                    var cpuUsage = MetricCacher.GetValue(Raven.Server.Utils.MetricCacher.Keys.Server.CpuUsage, CpuUsageCalculator.Calculate);
+                    var overallMachineCpuUsage = cpuUsage.MachineCpuUsage;
                     var utilizationOverAllCores = (overallMachineCpuUsage / 100) * Environment.ProcessorCount;
                     CpuCreditsBalance.CurrentConsumption = utilizationOverAllCores;
                     CpuCreditsBalance.MachineCpuUsage = overallMachineCpuUsage;
@@ -1813,7 +1814,7 @@ namespace Raven.Server
                         $"1) Change the ServerUrl.Tcp property in setting.json file.{Environment.NewLine}" +
                         $"2) Run the server from the command line with --ServerUrl.Tcp option.{Environment.NewLine}" +
                         $"3) Add RAVEN_ServerUrl_Tcp to the Environment Variables.{Environment.NewLine}" +
-                        "For more information go to https://ravendb.net/l/EJS81M/5.3";
+                        "For more information go to https://ravendb.net/l/EJS81M/5.4";
 
                         errors.Add(new IOException(msg, ex));
                         if (Logger.IsOperationsEnabled)

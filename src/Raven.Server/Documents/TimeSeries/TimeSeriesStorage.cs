@@ -2694,7 +2694,7 @@ namespace Raven.Server.Documents.TimeSeries
             }
         }
 
-        public long GetNumberOfTimeSeriesSegmentsToProcess(DocumentsOperationContext context, string collection, in long afterEtag, out long totalCount)
+        public long GetNumberOfTimeSeriesSegmentsToProcess(DocumentsOperationContext context, string collection, in long afterEtag, out long totalCount, Stopwatch overallDuration)
         {
             var collectionName = _documentsStorage.GetCollection(collection, throwIfDoesNotExist: false);
             if (collectionName == null)
@@ -2713,10 +2713,10 @@ namespace Raven.Server.Documents.TimeSeries
 
             var indexDef = TimeSeriesSchema.FixedSizeIndexes[CollectionTimeSeriesEtagsSlice];
 
-            return table.GetNumberOfEntriesAfter(indexDef, afterEtag, out totalCount);
+            return table.GetNumberOfEntriesAfter(indexDef, afterEtag, out totalCount, overallDuration);
         }
 
-        public long GetNumberOfTimeSeriesDeletedRangesToProcess(DocumentsOperationContext context, string collection, in long afterEtag, out long totalCount)
+        public long GetNumberOfTimeSeriesDeletedRangesToProcess(DocumentsOperationContext context, string collection, in long afterEtag, out long totalCount, Stopwatch overallDuration)
         {
             var collectionName = _documentsStorage.GetCollection(collection, throwIfDoesNotExist: false);
             if (collectionName == null)
@@ -2735,7 +2735,7 @@ namespace Raven.Server.Documents.TimeSeries
 
             var indexDef = DeleteRangesSchema.FixedSizeIndexes[CollectionDeletedRangesEtagsSlice];
 
-            return table.GetNumberOfEntriesAfter(indexDef, afterEtag, out totalCount);
+            return table.GetNumberOfEntriesAfter(indexDef, afterEtag, out totalCount, overallDuration);
         }
 
         [Conditional("DEBUG")]

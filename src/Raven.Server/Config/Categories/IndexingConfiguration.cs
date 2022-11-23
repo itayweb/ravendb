@@ -7,6 +7,7 @@ using Raven.Client;
 using Raven.Client.Documents.Indexes;
 using Raven.Server.Config.Attributes;
 using Raven.Server.Config.Settings;
+using Raven.Server.Documents.Indexes;
 using Raven.Server.Documents.Indexes.Analysis;
 using Raven.Server.Documents.Indexes.Configuration;
 using Raven.Server.Documents.Indexes.Persistence.Lucene;
@@ -222,12 +223,14 @@ namespace Raven.Server.Config.Categories
         [DefaultValue(2)]
         [IndexUpdateType(IndexUpdateType.Reset)]
         [ConfigurationEntry("Indexing.Analyzers.NGram.MinGram", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.Lucene.Analyzers.NGram.MinGram", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public int MinGram { get; set; }
 
         [Description("Largest n-gram to generate when NGram analyzer is used")]
         [DefaultValue(6)]
         [IndexUpdateType(IndexUpdateType.Reset)]
         [ConfigurationEntry("Indexing.Analyzers.NGram.MaxGram", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.Lucene.Analyzers.NGram.MaxGram", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public int MaxGram { get; set; }
 
         [Description("Managed allocations limit in an indexing batch after which the batch will complete and an index will continue by starting a new one")]
@@ -242,12 +245,14 @@ namespace Raven.Server.Config.Categories
         [SizeUnit(SizeUnit.Megabytes)]
         [IndexUpdateType(IndexUpdateType.Refresh)]
         [ConfigurationEntry("Indexing.MaximumSizePerSegmentInMb", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.Lucene.MaximumSizePerSegmentInMb", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public Size MaximumSizePerSegment { get; protected set; }
 
         [Description("Expert: How often segment indices are merged. With smaller values, less RAM is used while indexing, and searches on unoptimized indices are faster, but indexing speed is slower")]
         [DefaultValue(10)]
         [IndexUpdateType(IndexUpdateType.Refresh)]
         [ConfigurationEntry("Indexing.MergeFactor", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.Lucene.MergeFactor", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public int MergeFactor { get; protected set; }
 
         [Description("Expert: The definition of a large segment in MB. We wont merge more than " + nameof(NumberOfLargeSegmentsToMergeInSingleBatch) + " in a single batch")]
@@ -255,11 +260,13 @@ namespace Raven.Server.Config.Categories
         [SizeUnit(SizeUnit.Megabytes)]
         [IndexUpdateType(IndexUpdateType.Refresh)]
         [ConfigurationEntry("Indexing.LargeSegmentSizeToMergeInMb", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.Lucene.LargeSegmentSizeToMergeInMb", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public Size LargeSegmentSizeToMerge { get; protected set; }
 
         [Description("Expert: Number of large segments (defined by " + nameof(LargeSegmentSizeToMerge) + ") to merge in a single batch")]
         [DefaultValue(2)]
         [IndexUpdateType(IndexUpdateType.Refresh)]
+        [ConfigurationEntry("Indexing.Lucene.NumberOfLargeSegmentsToMergeInSingleBatch", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         [ConfigurationEntry("Indexing.NumberOfLargeSegmentsToMergeInSingleBatch", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public int NumberOfLargeSegmentsToMergeInSingleBatch { get; protected set; }
 
@@ -268,6 +275,7 @@ namespace Raven.Server.Config.Categories
         [TimeUnit(TimeUnit.Seconds)]
         [IndexUpdateType(IndexUpdateType.Refresh)]
         [ConfigurationEntry("Indexing.MaxTimeForMergesToKeepRunningInSec", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.Lucene.MaxTimeForMergesToKeepRunningInSec", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public TimeSetting MaxTimeForMergesToKeepRunning { get; protected set; }
 
         [Description("Transaction size limit after which an index will stop and complete the current batch")]
@@ -379,6 +387,18 @@ namespace Raven.Server.Config.Categories
         [ConfigurationEntry("Indexing.Throttling.TimeIntervalInMs", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
         public TimeSetting? ThrottlingTimeInterval { get; protected set; }
 
+        [Description("Search engine for auto indexes")]
+        [DefaultValue(SearchEngineType.Lucene)]
+        [IndexUpdateType(IndexUpdateType.Reset)]
+        [ConfigurationEntry("Indexing.Auto.SearchEngineType", ConfigurationEntryScope.ServerWideOrPerDatabase)]
+        public SearchEngineType AutoIndexingEngineType { get; protected set; }
+
+        [Description("Search engine for static indexes")]
+        [DefaultValue(SearchEngineType.Lucene)]
+        [IndexUpdateType(IndexUpdateType.Reset)]
+        [ConfigurationEntry(Constants.Configuration.Indexes.IndexingStaticSearchEngineType, ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        public SearchEngineType StaticIndexingEngineType { get; protected set; }
+        
         public Lazy<AnalyzerFactory> DefaultAnalyzerType { get; private set; }
 
         public Lazy<AnalyzerFactory> DefaultExactAnalyzerType { get; private set; }
@@ -403,7 +423,26 @@ namespace Raven.Server.Config.Categories
         [IndexUpdateType(IndexUpdateType.None)]
         [ConfigurationEntry("Indexing.Static.RequireAdminToDeployJavaScriptIndexes", ConfigurationEntryScope.ServerWideOrPerDatabase)]
         public bool RequireAdminToDeployJavaScriptIndexes { get; set; }
-
+        
+        [Description("Order by score automatically when boosting is inside index definition or query.")]
+        [DefaultValue(true)]
+        [IndexUpdateType(IndexUpdateType.Refresh)]
+        [ConfigurationEntry("Indexing.OrderByScoreAutomaticallyWhenBoostingIsInvolved", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        public bool OrderByScoreAutomaticallyWhenBoostingIsInvolved { get; set; }
+        
+        [Description("EXPERT: Use compound file in merging")]
+        [DefaultValue(true)]
+        [IndexUpdateType(IndexUpdateType.Refresh)]
+        [ConfigurationEntry("Indexing.Lucene.UseCompoundFileInMerging", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        [ConfigurationEntry("Indexing.UseCompoundFileInMerging", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        public bool LuceneUseCompoundFileInMerging { get; set; }
+        
+        [Description("Lucene index input")]
+        [DefaultValue(LuceneIndexInputType.Buffered)]
+        [IndexUpdateType(IndexUpdateType.Refresh)]
+        [ConfigurationEntry("Indexing.Lucene.IndexInputType", ConfigurationEntryScope.ServerWideOrPerDatabaseOrPerIndex)]
+        public LuceneIndexInputType LuceneIndexInput { get; set; }
+        
         protected override void ValidateProperty(PropertyInfo property)
         {
             base.ValidateProperty(property);
@@ -422,9 +461,9 @@ namespace Raven.Server.Config.Categories
 
         public void InitializeAnalyzers(string resourceName)
         {
-            DefaultAnalyzerType = new Lazy<AnalyzerFactory>(() => IndexingExtensions.GetAnalyzerType("@default", DefaultAnalyzer, resourceName));
-            DefaultExactAnalyzerType = new Lazy<AnalyzerFactory>(() => IndexingExtensions.GetAnalyzerType("@default", DefaultExactAnalyzer, resourceName));
-            DefaultSearchAnalyzerType = new Lazy<AnalyzerFactory>(() => IndexingExtensions.GetAnalyzerType("@default", DefaultSearchAnalyzer, resourceName));
+            DefaultAnalyzerType = new Lazy<AnalyzerFactory>(() => LuceneIndexingExtensions.GetAnalyzerType("@default", DefaultAnalyzer, resourceName));
+            DefaultExactAnalyzerType = new Lazy<AnalyzerFactory>(() => LuceneIndexingExtensions.GetAnalyzerType("@default", DefaultExactAnalyzer, resourceName));
+            DefaultSearchAnalyzerType = new Lazy<AnalyzerFactory>(() => LuceneIndexingExtensions.GetAnalyzerType("@default", DefaultSearchAnalyzer, resourceName));
         }
 
         public enum ErrorIndexStartupBehaviorType

@@ -40,10 +40,65 @@
                    <pre class="copy-area"><a href="#" class="copy-button-hidden" title="Copy code sample" data-bind="click: _.partial($root.copySample, 'olapEtlSampleCustomPartition')"><i class="icon-copy"></i></a><span data-bind="html: olapEtlSampleCustomPartitionHtml"></span></pre>
                </div>
            </div>
-       </div>
-       <div class="modal-footer margin-bottom">
-           <div class="text-left bg-info text-info padding padding-sm">
-               <span class="padding"><strong>Note</strong>: The destination <span data-bind="text: etlType() === 'Raven' ? 'collection' : (etlType() === 'Sql' ? 'table' : 'index')"></span> name must be concatenated to the <strong>'loadTo'</strong> keyword</span>
+           <div data-bind="if: etlType() === 'Kafka'" class="copy-area">
+               <h3 class="margin-bottom margin-bottom-lg margin-top">Sample Kafka ETL Transformation Script</h3>
+               <div class="margin-bottom">
+                   <pre class="copy-area"><a href="#" class="copy-button-hidden" title="Copy code sample" data-bind="click: copySample"><i class="icon-copy"></i></a><span data-bind="html: kafkaEtlSampleHtml"></span></pre>
+               </div>
+           </div>
+           <div data-bind="if: etlType() === 'RabbitMQ'" class="copy-area">
+               <h3 class="margin-bottom margin-bottom-lg margin-top">Sample RabbitMQ ETL Transformation Script</h3>
+               <div>Example</div>
+               <div class="margin-bottom">
+                   <pre class="copy-area"><a href="#" class="copy-button-hidden" title="Copy code sample" data-bind="click: copySample"><i class="icon-copy"></i></a><span data-bind="html: rabbitMqEtlSampleHtml"></span></pre>
+               </div>
+               <table class="table table-striped table-condensed margin-top-lg">
+                   <thead>
+                   </thead>
+                   <tbody>
+                   <tr>
+                       <th><strong><em>loadTo</em> Option</strong></th>
+                       <th><strong>Target Exchange</strong></th>
+                       <th><strong>Routing Key</strong></th>
+                   </tr>
+                   <tr>
+                       <td><code>loadToUsers({ Name: 'Bob' })</code></td>
+                       <td>Users</td>
+                       <td class="text-muted">empty (default)</td>
+                   </tr>
+                   <tr>
+                       <td><code>loadToUsers({ Name: 'Bob' }, 'admin')</code></td>
+                       <td>Users</td>
+                       <td>admin</td>
+                   </tr>
+                   <tr>
+                       <td>
+                           <code>loadToUsers({ Name: 'Bob' }, {<br />
+                               <span class="margin-left-lg">Id: ...,</span><br />
+                               <span class="margin-left-lg">PartitionKey: ...,</span><br />
+                               <span class="margin-left-lg">Source: ...,</span><br />
+                               <span class="margin-left-lg">Type: ...</span><br /> })
+                           </code>
+                       </td>
+                       <td>Users</td>
+                       <td class="text-muted">empty (default)</td>
+                   </tr>
+                   <tr>
+                       <td>
+                           <code>loadToUsers({ Name: 'Bob' }, 'admin', {<br />
+                               <span class="margin-left-lg">Type: ...,</span><br /> })
+                           </code>
+                       </td>
+                       <td>Users</td>
+                       <td>admin</td>
+                   </tr>
+                   <tr>
+                       <td><code>loadTo('', { Name: 'Bob' }, 'users-queue')</code></td>
+                       <td class="text-muted">empty (default)</td>
+                       <td>users-queue</td>
+                   </tr>
+                   </tbody>
+               </table>
            </div>
        </div>
     </div>

@@ -2,6 +2,7 @@
 using System.Linq;
 using FastTests;
 using Raven.Client.Documents.Indexes;
+using Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -34,10 +35,11 @@ namespace SlowTests.Issues
             }
         }
 
-        [Fact]
-        public void CanUseDefaultFieldToSetAnalyzer()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanUseDefaultFieldToSetAnalyzer(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 using (var session = store.OpenSession())
                 {
@@ -46,7 +48,7 @@ namespace SlowTests.Issues
                 }
                 new MyIndex().Execute(store);
                 Indexes.WaitForIndexing(store);
-
+                WaitForUserToContinueTheTest(store);
                 using (var session = store.OpenSession())
                 {
                     var users = session.Advanced.DocumentQuery<User, MyIndex>()

@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using Sparrow.Platform;
 
 namespace Sparrow.Utils
 {
 #if NETCOREAPP3_1_OR_GREATER
+    [SuppressUnmanagedCodeSecurity]
     public static unsafe class ZstdLib
     {
         private const string LIBZSTD = @"libzstd";
@@ -33,12 +36,16 @@ namespace Sparrow.Utils
         {
             fixed (byte* srcPtr = compressed)
             {
-                ulong size = ZSTD_getFrameContentSize(srcPtr, (UIntPtr)compressed.Length);
-                if (size == ZSTD_CONTENTSIZE_ERROR || size == ZSTD_CONTENTSIZE_UNKNOWN)
-                    throw new InvalidDataException("Unable to get the content size from ZSTD value");
-
-                return (int)size;
+                return GetDecompressedSize(srcPtr, compressed.Length);
             }
+        }
+
+        public static int GetDecompressedSize(byte* srcPtr, int len)
+        {
+            ulong size = ZSTD_getFrameContentSize(srcPtr, (UIntPtr)len);
+            if (size is ZSTD_CONTENTSIZE_ERROR or ZSTD_CONTENTSIZE_UNKNOWN)
+                throw new InvalidDataException("Unable to get the content size from ZSTD value");
+            return (int)size;
         }
 
         public static long GetMaxCompression(long size)
@@ -151,17 +158,26 @@ namespace Sparrow.Utils
                               *       requires explicitly allowing such size at streaming decompression stage. */
         };
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void AssertZstdSuccess(UIntPtr v)
         {
-            if (ZSTD_isError(v) == 0)
+            ulong code = v.ToUInt64();
+            if (ZSTD_Error_maxCode > code)
                 return;
 
+            RaiseError(v);
+        }
+
+        private static void RaiseError(UIntPtr v)
+        {
             throw new InvalidOperationException(Marshal.PtrToStringAnsi(ZSTD_getErrorName(v)));
         }
+        const ulong ZSTD_Error_maxCode = unchecked(0UL - 120L);
 
         private static void AssertSuccess(UIntPtr v, CompressionDictionary dictionary)
         {
-            if (ZSTD_isError(v) == 0)
+            ulong code = v.ToUInt64();
+            if (ZSTD_Error_maxCode > code)
                 return;
 
             string ptrToStringAnsi = Marshal.PtrToStringAnsi(ZSTD_getErrorName(v));
@@ -259,23 +275,29 @@ namespace Sparrow.Utils
 
         public static int Decompress(ReadOnlySpan<byte> src, Span<byte> dst, CompressionDictionary dictionary)
         {
-            _threadCompressContext ??= new CompressContext();
-
             fixed (byte* srcPtr = src)
             fixed (byte* dstPtr = dst)
             {
-                UIntPtr result;
-                if (dictionary == null || dictionary.Compression == null)
-                {
-                    result = ZSTD_decompressDCtx(_threadCompressContext.Decompression, dstPtr, (UIntPtr)dst.Length, srcPtr, (UIntPtr)src.Length);
-                }
-                else
-                {
-                    result = ZSTD_decompress_usingDDict(_threadCompressContext.Decompression, dstPtr, (UIntPtr)dst.Length, srcPtr, (UIntPtr)src.Length, dictionary.Decompression);
-                }
-                AssertSuccess(result, dictionary);
-                return (int)result;
+                return Decompress(srcPtr, src.Length, dstPtr, dst.Length, dictionary);
             }
+        }
+
+        public static int Decompress( byte* srcPtr, int srcSize, byte* dstPtr, int dstSize, CompressionDictionary dictionary)
+        {
+            _threadCompressContext ??= new CompressContext();
+
+            UIntPtr result;
+            if (dictionary == null || dictionary.Compression == null)
+            {
+                result = ZSTD_decompressDCtx(_threadCompressContext.Decompression, dstPtr, (UIntPtr)dstSize, srcPtr, (UIntPtr)srcSize);
+            }
+            else
+            {
+                result = ZSTD_decompress_usingDDict(_threadCompressContext.Decompression, dstPtr, (UIntPtr)dstSize, srcPtr, (UIntPtr)srcSize, dictionary.Decompression);
+            }
+
+            AssertSuccess(result, dictionary);
+            return (int)result;
         }
 
         public class CompressionDictionary : IDisposable

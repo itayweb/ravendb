@@ -22,7 +22,7 @@ namespace Raven.Client.Documents.Operations.ETL
 
         private static readonly Regex LoadToMethodRegex = new Regex($@"{LoadTo}(\w+)", RegexOptions.Compiled);
 
-        private static readonly Regex LoadToMethodRegexAlt = new Regex($@"{LoadTo}\(\'([\w\.]+)\'|{LoadTo}\(\""([\w\.]+)\""", RegexOptions.Compiled);
+        private static readonly Regex LoadToMethodRegexAlt = new Regex($@"{LoadTo}\(\'([\w\.]*)\'|{LoadTo}\(\""([\w\.]*)\""", RegexOptions.Compiled);
 
         private static readonly Regex LoadAttachmentMethodRegex = new Regex(LoadAttachment, RegexOptions.Compiled);
         private static readonly Regex AddAttachmentMethodRegex = new Regex(AddAttachment, RegexOptions.Compiled);
@@ -248,6 +248,8 @@ namespace Raven.Client.Documents.Operations.ETL
         internal bool IsAddingAttachments { get; private set; }
 
         internal bool IsLoadingAttachments { get; private set; }
+        
+        public string DocumentIdPostfix { get; set; }
 
         public Transformation()
         {
@@ -389,6 +391,9 @@ namespace Raven.Client.Documents.Operations.ETL
                             case EtlType.ElasticSearch:
                                 targetName = "Index";
                                 break;
+                            case EtlType.Queue:
+                                targetName = "Queue";
+                                break;
                             default:
                                 throw new ArgumentException($"Unknown ETL type: {type}");
 
@@ -407,6 +412,12 @@ namespace Raven.Client.Documents.Operations.ETL
                 IsEmptyScript = true;
             }
 
+            if (IsEmptyScript)
+            {
+                if (type != EtlType.Raven)
+                    errors.Add($"Script '{Name}' must not be empty");
+            }
+
             return errors.Count == 0;
         }
 
@@ -418,6 +429,7 @@ namespace Raven.Client.Documents.Operations.ETL
                 [nameof(Script)] = Script,
                 [nameof(Collections)] = new DynamicJsonArray(Collections),
                 [nameof(ApplyToAllDocuments)] = ApplyToAllDocuments,
+                [nameof(DocumentIdPostfix)] = DocumentIdPostfix,
                 [nameof(Disabled)] = Disabled
             };
         }
@@ -451,6 +463,9 @@ namespace Raven.Client.Documents.Operations.ETL
             if (transformation.ApplyToAllDocuments != ApplyToAllDocuments)
                 differences |= EtlConfigurationCompareDifferences.TransformationApplyToAllDocuments;
 
+            if (transformation.DocumentIdPostfix != DocumentIdPostfix)
+                differences |= EtlConfigurationCompareDifferences.TransformationDocumentIdPostfix;
+            
             if (transformation.Disabled != Disabled)
                 differences |= EtlConfigurationCompareDifferences.TransformationDisabled;
 

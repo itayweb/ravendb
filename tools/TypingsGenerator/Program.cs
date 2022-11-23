@@ -22,6 +22,7 @@ using Raven.Client.Documents.Operations.Counters;
 using Raven.Client.Documents.Operations.ETL;
 using Raven.Client.Documents.Operations.ETL.ElasticSearch;
 using Raven.Client.Documents.Operations.ETL.OLAP;
+using Raven.Client.Documents.Operations.ETL.Queue;
 using Raven.Client.Documents.Operations.ETL.SQL;
 using Raven.Client.Documents.Operations.Expiration;
 using Raven.Client.Documents.Operations.Indexes;
@@ -60,6 +61,7 @@ using Raven.Server.Documents.ETL;
 using Raven.Server.Documents.ETL.Providers.ElasticSearch.Test;
 using Raven.Server.Documents.ETL.Providers.OLAP;
 using Raven.Server.Documents.ETL.Providers.OLAP.Test;
+using Raven.Server.Documents.ETL.Providers.Queue.Test;
 using Raven.Server.Documents.ETL.Providers.Raven.Test;
 using Raven.Server.Documents.ETL.Providers.SQL.RelationalWriters;
 using Raven.Server.Documents.ETL.Providers.SQL.Test;
@@ -68,6 +70,7 @@ using Raven.Server.Documents.Handlers;
 using Raven.Server.Documents.Handlers.Admin;
 using Raven.Server.Documents.Handlers.Debugging;
 using Raven.Server.Documents.Indexes.Debugging;
+using Raven.Server.Documents.Indexes.IndexMerging;
 using Raven.Server.Documents.Indexes.Spatial;
 using Raven.Server.Documents.Operations;
 using Raven.Server.Documents.Patch;
@@ -270,6 +273,7 @@ namespace TypingsGenerator
             scripter.AddType(typeof(IndexDefinition));
             scripter.AddType(typeof(PutIndexResult));
             scripter.AddType(typeof(IndexStats));
+            scripter.AddType(typeof(IndexMergeResults));
             scripter.AddType(typeof(IndexingStatus));
             scripter.AddType(typeof(IndexPerformanceStats));
             scripter.AddType(typeof(IndexDefinition));
@@ -277,7 +281,7 @@ namespace TypingsGenerator
             scripter.AddType(typeof(IndexProgress));
             scripter.AddType(typeof(IndexesProgress));
             scripter.AddType(typeof(IndexErrors));
-            scripter.AddType(typeof(StudioTasksHandler.FormattedExpression));
+            scripter.AddType(typeof(Raven.Server.Documents.Indexes.IndexMerging.SourceCodeBeautifier.FormattedExpression));
             scripter.AddType(typeof(StudioIndexHandler.IndexTypeInfo));
             scripter.AddType(typeof(AdminIndexHandler.DumpIndexResult));
             scripter.AddType(typeof(StudioDatabaseTasksHandler.IndexDefaults));
@@ -490,12 +494,21 @@ namespace TypingsGenerator
             scripter.AddType(typeof(ElasticSearchEtlConfiguration));
             scripter.AddType(typeof(ElasticSearchEtlTestScriptResult));
             scripter.AddType(typeof(TestElasticSearchEtlScript));
+            
+            // ongoing tasks - Queue ETL
+            scripter.AddType(typeof(OngoingTaskQueueEtlDetails));
+            scripter.AddType(typeof(OngoingTaskQueueEtlListView));
+            scripter.AddType(typeof(QueueEtlConfiguration));
+            scripter.AddType(typeof(QueueEtlTestScriptResult));
+            scripter.AddType(typeof(TestQueueEtlScript));
+            scripter.AddType(typeof(KafkaConnectionSettings));
 
             // connection strings
             scripter.AddType(typeof(ConnectionString));
             scripter.AddType(typeof(RavenConnectionString));
             scripter.AddType(typeof(SqlConnectionString));
             scripter.AddType(typeof(ElasticSearchConnectionString));
+            scripter.AddType(typeof(QueueConnectionString));
             scripter.AddType(typeof(ConnectionStringType));
             scripter.AddType(typeof(GetConnectionStringsResult));
 

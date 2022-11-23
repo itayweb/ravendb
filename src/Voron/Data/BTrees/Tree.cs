@@ -13,6 +13,7 @@ using Voron.Impl;
 using Voron.Impl.Paging;
 using Sparrow.Collections;
 using Sparrow.Server;
+using Voron.Data.CompactTrees;
 using Constants = Voron.Global.Constants;
 
 namespace Voron.Data.BTrees
@@ -29,6 +30,8 @@ namespace Voron.Data.BTrees
         private readonly RecentlyFoundTreePages _recentlyFoundPages;
 
         private Dictionary<Slice, FixedSizeTree> _fixedSizeTrees;
+        private Dictionary<Slice, FixedSizeTree<double>> _fixedSizeTreesForDouble;
+        private Dictionary<Slice, CompactTree> _compactTrees;
 
         public event Action<long, PageFlags> PageModified;
         public event Action<long, PageFlags> PageFreed;
@@ -680,6 +683,7 @@ namespace Voron.Data.BTrees
 
             return SearchForPage(key, allowCompressed, out cursor, out node);
         }
+
         [ThreadStatic]
         private static FastList<long> CursorPathBuffer;
 
@@ -1297,11 +1301,28 @@ namespace Voron.Data.BTrees
             return Name + " " + State.NumberOfEntries;
         }
 
+        internal void PrepareForCommit()
+        {
+            if (_compactTrees != null)
+            {
+                foreach (var ct in _compactTrees.Values)
+                    ct.PrepareForCommit();
+            }
+        }
+
         public void Dispose()
         {
             if (_fixedSizeTrees != null)
             {
                 foreach (var tree in _fixedSizeTrees)
+                {
+                    tree.Value.Dispose();
+                }
+            }
+            
+            if (_fixedSizeTreesForDouble != null)
+            {
+                foreach (var tree in _fixedSizeTreesForDouble)
                 {
                     tree.Value.Dispose();
                 }
@@ -1376,16 +1397,65 @@ namespace Voron.Data.BTrees
             _recentlyFoundPages?.Clear();
         }
 
+        public CompactTree CompactTreeFor(string key)
+        {
+            using var _ = Slice.From(_llt.Allocator, key, ByteStringType.Immutable, out var keySlice);
+            return CompactTreeFor(keySlice);
+        }
+        
+        public CompactTree CompactTreeFor(Slice key)
+        {
+            _compactTrees ??= new Dictionary<Slice, CompactTree>(SliceComparer.Instance);
+
+            if (_compactTrees.TryGetValue(key, out var compactTree) == false)
+            {
+                compactTree = CompactTree.InternalCreate(this, key);
+                if (compactTree == null) // missing value on read transaction
+                    return null;
+                
+                _compactTrees[key.Clone(_llt.Allocator)] = compactTree;
+            }
+
+            State.Flags |= TreeFlags.CompactTrees;
+
+            return compactTree;
+        }
+
+        public long DeleteCompactTreeFor(Slice key)
+        {
+            var compactTree = CompactTreeFor(key);
+            var numberOfEntries = compactTree.NumberOfEntries;
+
+            CompactTree.Delete(compactTree, this);
+            _compactTrees.Remove(key);
+
+            return numberOfEntries;
+        }
+
+
         public FixedSizeTree FixedTreeFor(Slice key, byte valSize = 0)
         {
-            if (_fixedSizeTrees == null)
-                _fixedSizeTrees = new Dictionary<Slice, FixedSizeTree>(SliceComparer.Instance);
+            _fixedSizeTrees ??= new Dictionary<Slice, FixedSizeTree>(SliceComparer.Instance);
 
-            FixedSizeTree fixedTree;
-            if (_fixedSizeTrees.TryGetValue(key, out fixedTree) == false)
+            if (_fixedSizeTrees.TryGetValue(key, out var fixedTree) == false)
             {
                 fixedTree = new FixedSizeTree(_llt, this, key, valSize);
                 _fixedSizeTrees[fixedTree.Name] = fixedTree;
+            }
+
+            State.Flags |= TreeFlags.FixedSizeTrees;
+
+            return fixedTree;
+        }
+
+        public FixedSizeTree<double> FixedTreeForDouble(Slice key, byte valSize = 0)
+        {
+            _fixedSizeTreesForDouble ??= new Dictionary<Slice, FixedSizeTree<double>>(SliceComparer.Instance);
+
+            if (_fixedSizeTreesForDouble.TryGetValue(key, out var fixedTree) == false)
+            {
+                fixedTree = new FixedSizeTree<double>(_llt, this, key, valSize);
+                _fixedSizeTreesForDouble[fixedTree.Name] = fixedTree;
             }
 
             State.Flags |= TreeFlags.FixedSizeTrees;
@@ -1416,6 +1486,7 @@ namespace Voron.Data.BTrees
                 }
             }
             _fixedSizeTrees.Remove(key);
+            _fixedSizeTreesForDouble?.Remove(key);
             Delete(key);
 
             return numberOfEntries;

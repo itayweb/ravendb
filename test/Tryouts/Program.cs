@@ -1,47 +1,64 @@
 using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
-using FastTests.Blittable;
-using FastTests.Client.Subscriptions;
-using FastTests.Client;
-using RachisTests;
-using SlowTests.Client.TimeSeries.Replication;
-using SlowTests.Issues;
-using SlowTests.MailingList;
-using SlowTests.Rolling;
-using SlowTests.Server.Documents.ETL.Raven;
-using StressTests.Issues;
 using Tests.Infrastructure;
+using FastTests.Voron.Sets;
+using FastTests.Corax;
 
-namespace Tryouts
+namespace Tryouts;
+
+public static class Program
 {
-    public static class Program
+    static Program()
     {
-        static Program()
-        {
-            XunitLogging.RedirectStreams = false;
-        }
+        XunitLogging.RedirectStreams = false;
+    }
 
-        public static async Task Main(string[] args)
+    public static void Main(string[] args)
+    {
+        Console.WriteLine(Process.GetCurrentProcess().Id);        
+
+        for (int i = 0; i < 100; i++)
         {
-            Console.WriteLine(Process.GetCurrentProcess().Id);
-            for (int i = 0; i < 10_000; i++)
+            Console.WriteLine($"Starting to run {i}");
+            try
             {
-                 Console.WriteLine($"Starting to run {i}");
-                try
+                using (var testOutputHelper = new ConsoleTestOutputHelper())
                 {
-                    using (var testOutputHelper = new ConsoleTestOutputHelper())
-                    using (var test = new ElectionTests(testOutputHelper))
+                    int minFailure = int.MaxValue;
+                    int failureRandom = -1;
+
+                    var rnd = new Random();
+                    int number = 500000;
+                    while (number > 16)
                     {
-                         await test.CanElectOnDivergence4();
+                        int seed = rnd.Next(100000);
+                        try
+                        {
+                           // new SetTests(testOutputHelper).CanDeleteAndInsertInBulk(seed, number, 1000, includeDuplicates:true);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (number < minFailure)
+                            {
+                                minFailure = number;
+                                failureRandom = seed;
+                                Console.WriteLine($"[N:{minFailure}, Rnd:{failureRandom}]");
+                                Console.WriteLine($"--> {ex}");
+                            }
+                        }
+
+                        number = rnd.Next(Math.Min(500000, minFailure));
                     }
+
+                    Console.ReadLine();
                 }
-                catch (Exception e)
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(e);
-                    Console.ForegroundColor = ConsoleColor.White;
-                }
+            }
+            catch (Exception e)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(e);
+                Console.ForegroundColor = ConsoleColor.White;
+                return;
             }
         }
     }

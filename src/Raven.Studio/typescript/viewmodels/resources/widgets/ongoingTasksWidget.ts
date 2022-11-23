@@ -13,7 +13,7 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
 
     view = require("views/resources/widgets/ongoingTasksWidget.html");
     
-    static readonly taskInfoRecord: Record<Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskType, taskInfo> = {
+    static readonly taskInfoRecord: Record<StudioTaskType, taskInfo> = {
         "Replication": {
             nameForUI: "External Replication",
             icon: "icon-external-replication",
@@ -49,6 +49,16 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
             icon: "icon-elastic-search-etl",
             colorClass: "elastic-etl"
         },
+        "KafkaQueueEtl": {
+            nameForUI: "Kafka ETL",
+            icon: "icon-kafka-etl",
+            colorClass: "kafka-etl"
+        },
+        "RabbitQueueEtl": {
+            nameForUI: "RabbitMQ ETL",
+            icon: "icon-rabbitmq-etl",
+            colorClass: "rabbitmq-etl"
+        },
         "Backup": {
             nameForUI: "Backup",
             icon: "icon-backups",
@@ -58,7 +68,7 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
             nameForUI: "Subscription",
             icon: "icon-subscription",
             colorClass: "subscription"
-    }
+        }
     }
 
     protected gridController = ko.observable<virtualGridController<taskItem>>();
@@ -154,14 +164,14 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
 
     private getTaskCountText(item: taskItem): string {
         const count = item.taskCount();
-        
+
         if (item.isTitleItem() && !item.taskCount()) {
             return "";
         } 
     
         return count.toLocaleString();
     }
-
+    
     private getTaskCountIcon(item: taskItem): string {
         if (item.isTitleItem() && !item.taskCount()) {
             return "icon-cancel";
@@ -169,19 +179,19 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
 
         return "";
     }
-        
+
     private getTaskCountClass(item: taskItem): string {
         if (!item.isTitleItem()) {
             return ""
     }
-
+        
         if (item.taskCount()) {
             return "text-bold";
-        }
+    }
 
         return "text-muted small";
         }
-    
+
     private prepareColumns(): virtualColumn[] {
         const grid = this.gridController();
         return [
@@ -201,7 +211,7 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
                 headerTitle: "Nodes running the tasks"
             })
         ];
-    }
+        }
 
     reducePerDatabase(itemsArray: rawTaskItem[]): taskItem[] {
         const output: taskItem[] = [];
@@ -219,7 +229,7 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
         return output;
     }
         
-    private getTaskType(input: string): Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskType {
+    private getTaskType(input: string): StudioTaskType {
         switch (input) {
             case "ExternalReplicationCount":
                 return "Replication";
@@ -235,6 +245,10 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
                 return "OlapEtl";
             case "ElasticSearchEtlCount":
                 return "ElasticSearchEtl";
+            case "KafkaEtlCount":
+                return "KafkaQueueEtl";
+            case "RabbitMqEtlCount":
+                return "RabbitQueueEtl";
             case "PeriodicBackupCount":
                 return "Backup";
             case "SubscriptionCount":
@@ -288,7 +302,7 @@ class ongoingTasksWidget extends websocketBasedWidget<Raven.Server.Dashboard.Clu
     }
     
             const totalTasksPerType = reducedItems.reduce((sum, item) => sum + item.taskCount(), 0);
-            const titleItem = new taskItem(taskType as Raven.Client.Documents.Operations.OngoingTasks.OngoingTaskType, totalTasksPerType);
+            const titleItem = new taskItem(taskType as StudioTaskType, totalTasksPerType);
         
             tempDataToShow.push(titleItem);
         

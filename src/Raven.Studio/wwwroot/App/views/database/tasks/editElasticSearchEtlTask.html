@@ -96,9 +96,27 @@
                             </div>
                         </div>
                     </div>
-                    <div class="panel-addon" data-bind="visible: $root.elasticSearchEtlConnectionStringsNames().length === 0 && !$root.createNewConnectionString()">
-                        <div class="padding bg-warning small">
-                            <i class="icon-warning"></i>&nbsp;&nbsp;No connection strings have been defined yet
+                    <div>
+                        <div data-bind="if: createNewConnectionString">
+                            <div class="panel-addon" data-bind="with: testConnectionResult">
+                                <div class="padding bg-success small" data-bind="visible: Success">
+                                    <div>Successfully connected</div>
+                                </div>
+                                <div data-bind="if: !Success">
+                                    <div class="padding bg-danger small">
+                                        <h2>Connection test failed!</h2>
+                                        <span data-bind="text: $root.fullErrorDetailsVisible() ? Error : $root.shortErrorText()"></span>
+                                        <div>
+                                            <a href="#" data-bind="click: $root.fullErrorDetailsVisible.toggle.bind($root.fullErrorDetailsVisible), text: $root.fullErrorDetailsVisible() ? 'hide details' : 'show details'"></a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-addon" data-bind="visible: $root.elasticSearchEtlConnectionStringsNames().length === 0 && !$root.createNewConnectionString()">
+                            <div class="padding bg-warning small">
+                                <i class="icon-warning"></i>&nbsp;&nbsp;No connection strings have been defined yet
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -223,6 +241,13 @@
                                  data-bind="aceEditor: { code: script, fontSize: '14px', lang: 'ace/mode/javascript' }, validationOptions: { errorsAsTitle: false }, validationElement: script" style="height: 300px;"></pre>
                         <div data-bind="validationOptions: { errorsAsTitle: false }, validationElement: script">
                             <div class="help-block" data-bind="validationMessage: script"></div>
+                        </div>
+                    </div>
+                    <div class="flex-horizontal margin-bottom margin-top" data-bind="validationElement: documentIdPostfix">
+                        <label class="control-label"><strong>Document ID postfix:</strong></label>
+                        <div class="flex-grow margin-left">
+                            <input type="text" class="form-control" placeholder="Enter Document ID postfix (optional)" autocomplete="off"
+                                   data-bind="textInput: documentIdPostfix, disable: $root.enableTestArea()" />
                         </div>
                     </div>
                     <div class="margin-bottom margin-top margin-top-lg">

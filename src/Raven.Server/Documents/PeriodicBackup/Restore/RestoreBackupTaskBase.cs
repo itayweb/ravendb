@@ -736,6 +736,8 @@ namespace Raven.Server.Documents.PeriodicBackup.Restore
                     databaseRecord.OlapEtls = smugglerDatabaseRecord.OlapEtls;
                     databaseRecord.ElasticSearchEtls = smugglerDatabaseRecord.ElasticSearchEtls;
                     databaseRecord.ElasticSearchConnectionStrings = smugglerDatabaseRecord.ElasticSearchConnectionStrings;
+                    databaseRecord.QueueEtls = smugglerDatabaseRecord.QueueEtls;
+                    databaseRecord.QueueConnectionStrings = smugglerDatabaseRecord.QueueConnectionStrings;
 
                     // need to enable revisions before import
                     database.DocumentsStorage.RevisionsStorage.InitializeFromDatabaseRecord(smugglerDatabaseRecord);
@@ -822,6 +824,14 @@ namespace Raven.Server.Documents.PeriodicBackup.Restore
             if (databaseRecord.ElasticSearchEtls != null)
             {
                 foreach (var task in databaseRecord.ElasticSearchEtls)
+                {
+                    task.Disabled = true;
+                }
+            }
+
+            if (databaseRecord.QueueEtls != null)
+            {
+                foreach (var task in databaseRecord.QueueEtls)
                 {
                     task.Disabled = true;
                 }

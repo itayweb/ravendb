@@ -16,10 +16,13 @@ using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Indexes.Spatial;
 using Raven.Client.Documents.Operations;
 using Raven.Client.Documents.Queries;
+using Raven.Client.Exceptions.Corax;
+using Raven.Client.Exceptions.Database;
 using Raven.Client.Exceptions.Documents.Indexes;
 using Raven.Client.Extensions;
 using Raven.Client.ServerWide.Operations;
 using Raven.Client.Util;
+using Raven.Server.Config;
 using Raven.Server.Config.Categories;
 using Raven.Server.Config.Settings;
 using Raven.Server.Documents.Handlers.Admin;
@@ -28,6 +31,8 @@ using Raven.Server.Documents.Indexes.Auto;
 using Raven.Server.Documents.Indexes.MapReduce.Auto;
 using Raven.Server.Documents.Indexes.MapReduce.Exceptions;
 using Raven.Server.Documents.Indexes.MapReduce.Static;
+using Raven.Server.Documents.Indexes.Persistence;
+using Raven.Server.Documents.Indexes.Persistence.Corax;
 using Raven.Server.Documents.Indexes.Persistence.Lucene;
 using Raven.Server.Documents.Indexes.Static;
 using Raven.Server.Documents.Indexes.Static.Counters;
@@ -110,7 +115,7 @@ namespace Raven.Server.Documents.Indexes
 
         protected Logger _logger;
 
-        internal LuceneIndexPersistence IndexPersistence;
+        internal IndexPersistenceBase IndexPersistence;
 
         internal IndexFieldsPersistence IndexFieldsPersistence;
 
@@ -255,7 +260,7 @@ namespace Raven.Server.Documents.Indexes
         private readonly double _txAllocationsRatio;
 
         private readonly string _itemType;
-        
+
         internal bool SourceDocumentIncludedInOutput;
         private bool _alreadyNotifiedAboutIncludingDocumentInOutput;
 
@@ -553,6 +558,8 @@ namespace Raven.Server.Documents.Indexes
 
         public IndexType Type { get; }
 
+        public SearchEngineType SearchEngineType;
+
         public IndexSourceType SourceType { get; }
 
         public IndexState State { get; protected set; }
@@ -657,7 +664,7 @@ namespace Raven.Server.Documents.Indexes
             var indexPath = configuration.StoragePath.Combine(name);
 
             var indexTempPath = configuration.TempPath?.Combine(name);
-            
+
             var options = configuration.RunInMemory
                 ? StorageEnvironmentOptions.CreateMemoryOnly(indexPath.FullPath, indexTempPath?.FullPath ?? Path.Combine(indexPath.FullPath, "Temp"),
                     documentDatabase.IoChanges, documentDatabase.CatastrophicFailureNotification)
@@ -702,9 +709,9 @@ namespace Raven.Server.Documents.Indexes
                 options.SchemaUpgrader = SchemaUpgrader.Upgrader(SchemaUpgrader.StorageType.Index, null, null, null);
             }
 
-            if (options is not StorageEnvironmentOptions.DirectoryStorageEnvironmentOptions) 
+            if (options is not StorageEnvironmentOptions.DirectoryStorageEnvironmentOptions)
                 return;
-            
+
             string disableMarkerPath = options.BasePath.Combine("disable.marker").FullPath;
             if (File.Exists(disableMarkerPath))
             {
@@ -816,8 +823,24 @@ namespace Raven.Server.Documents.Indexes
             _indexStorage.Initialize(documentDatabase, environment);
 
             IndexPersistence?.Dispose();
+            SearchEngineType = IndexStorage.ReadSearchEngineType(Name, environment);
 
-            IndexPersistence = new LuceneIndexPersistence(this);
+            switch (SearchEngineType)
+            {
+                case SearchEngineType.None:
+                case SearchEngineType.Lucene:
+                    IndexPersistence = new LuceneIndexPersistence(this);
+                    SearchEngineType = SearchEngineType.Lucene;
+                    break;
+                case SearchEngineType.Corax:
+                    RavenConfiguration.AssertCanUseCoraxFeature(DocumentDatabase.ServerStore.Configuration);
+                    IndexPersistence = new CoraxIndexPersistence(this);
+                    SearchEngineType = SearchEngineType.Corax;
+                    break;
+                default:
+                    throw new InvalidDataException($"Cannot read search engine type for {Name}. Please reset the index.");
+            }
+
             IndexPersistence.Initialize(environment);
 
             IndexFieldsPersistence = new IndexFieldsPersistence(this);
@@ -2256,11 +2279,11 @@ namespace Raven.Server.Documents.Indexes
                 using (CurrentIndexingScope.Current =
                     new CurrentIndexingScope(this, DocumentDatabase.DocumentsStorage, context, Definition, indexContext, GetOrAddSpatialField, _unmanagedBuffersPool))
                 {
-                    var writeOperation = new Lazy<IndexWriteOperation>(() => IndexPersistence.OpenIndexWriter(indexContext.Transaction.InnerTransaction, indexContext));
+                    var writeOperation = new Lazy<IndexWriteOperationBase>(() => IndexPersistence.OpenIndexWriter(indexContext.Transaction.InnerTransaction, indexContext));
 
                     try
                     {
-                        int? entriesCount = null;
+                        long? entriesCount = null;
 
                         using (InitializeIndexingWork(indexContext))
                         {
@@ -2281,7 +2304,7 @@ namespace Raven.Server.Documents.Indexes
                             }
 
                             var current = new Size(GC.GetAllocatedBytesForCurrentThread(), SizeUnit.Bytes);
-                            stats.AddAllocatedBytes((current - _initialManagedAllocations).GetValue(SizeUnit.Bytes));
+                            stats.SetAllocatedManagedBytes((current - _initialManagedAllocations).GetValue(SizeUnit.Bytes));
 
                             if (writeOperation.IsValueCreated)
                             {
@@ -2359,7 +2382,7 @@ namespace Raven.Server.Documents.Indexes
             _updateReferenceLoadWarning = false;
         }
 
-        private void DisposeIndexWriterOnError(Lazy<IndexWriteOperation> writeOperation)
+        private void DisposeIndexWriterOnError(Lazy<IndexWriteOperationBase> writeOperation)
         {
             try
             {
@@ -2375,10 +2398,10 @@ namespace Raven.Server.Documents.Indexes
         public abstract IIndexedItemEnumerator GetMapEnumerator(IEnumerable<IndexItem> items, string collection, TransactionOperationContext indexContext,
             IndexingStatsScope stats, IndexType type);
 
-        public abstract void HandleDelete(Tombstone tombstone, string collection, Lazy<IndexWriteOperation> writer,
+        public abstract void HandleDelete(Tombstone tombstone, string collection, Lazy<IndexWriteOperationBase> writer,
             TransactionOperationContext indexContext, IndexingStatsScope stats);
 
-        public abstract int HandleMap(IndexItem indexItem, IEnumerable mapResults, Lazy<IndexWriteOperation> writer,
+        public abstract int HandleMap(IndexItem indexItem, IEnumerable mapResults, Lazy<IndexWriteOperationBase> writer,
             TransactionOperationContext indexContext, IndexingStatsScope stats);
 
         private void HandleIndexChange(IndexChange change)
@@ -2688,7 +2711,7 @@ namespace Raven.Server.Documents.Indexes
             _indexStorage.Rename(name);
         }
 
-        internal virtual IndexProgress GetProgress(QueryOperationContext queryContext, bool? isStale = null)
+        internal virtual IndexProgress GetProgress(QueryOperationContext queryContext, Stopwatch overallDuration, bool? isStale = null)
         {
             using (CurrentlyInUse(out var valid))
             {
@@ -2709,7 +2732,7 @@ namespace Raven.Server.Documents.Indexes
                     if (disposed)
                         return progress;
 
-                    UpdateIndexProgress(queryContext, progress, null);
+                    UpdateIndexProgress(queryContext, progress, null, overallDuration);
                     return progress;
                 }
 
@@ -2731,14 +2754,14 @@ namespace Raven.Server.Documents.Indexes
 
                     var stats = _indexStorage.ReadStats(tx);
 
-                    UpdateIndexProgress(queryContext, progress, stats);
+                    UpdateIndexProgress(queryContext, progress, stats, overallDuration);
 
                     return progress;
                 }
             }
         }
 
-        private void UpdateIndexProgress(QueryOperationContext queryContext, IndexProgress progress, IndexStats stats)
+        private void UpdateIndexProgress(QueryOperationContext queryContext, IndexProgress progress, IndexStats stats, Stopwatch overallDuration)
         {
             if (DeployedOnAllNodes == false)
             {
@@ -2772,7 +2795,7 @@ namespace Raven.Server.Documents.Indexes
                     };
                 }
 
-                UpdateProgressStats(queryContext, progressStats, collection);
+                UpdateProgressStats(queryContext, progressStats, collection, overallDuration);
             }
 
             var referencedCollections = GetReferencedCollections();
@@ -2802,23 +2825,24 @@ namespace Raven.Server.Documents.Indexes
                                 LastProcessedTombstoneEtag = lastEtags.LastProcessedTombstoneEtag
                             };
 
-                            UpdateProgressStats(queryContext, progressStats, value.Name);
+                            UpdateProgressStats(queryContext, progressStats, value.Name, overallDuration);
                         }
                     }
                 }
             }
         }
 
-        internal virtual void UpdateProgressStats(QueryOperationContext queryContext, IndexProgress.CollectionStats progressStats, string collectionName)
+        internal virtual void UpdateProgressStats(QueryOperationContext queryContext, IndexProgress.CollectionStats progressStats, string collectionName,
+            Stopwatch overallDuration)
         {
             progressStats.NumberOfItemsToProcess +=
                 DocumentDatabase.DocumentsStorage.GetNumberOfDocumentsToProcess(
-                    queryContext.Documents, collectionName, progressStats.LastProcessedItemEtag, out var totalCount);
+                    queryContext.Documents, collectionName, progressStats.LastProcessedItemEtag, out var totalCount, overallDuration);
             progressStats.TotalNumberOfItems += totalCount;
 
             progressStats.NumberOfTombstonesToProcess +=
                 DocumentDatabase.DocumentsStorage.GetNumberOfTombstonesToProcess(
-                    queryContext.Documents, collectionName, progressStats.LastProcessedTombstoneEtag, out totalCount);
+                    queryContext.Documents, collectionName, progressStats.LastProcessedTombstoneEtag, out totalCount, overallDuration);
             progressStats.TotalNumberOfTombstones += totalCount;
         }
 
@@ -2867,6 +2891,7 @@ namespace Raven.Server.Documents.Indexes
                     {
                         Name = Name,
                         Type = Type,
+                        SearchEngineType = SearchEngineType,
                         SourceType = SourceType,
                         LockMode = Definition?.LockMode ?? IndexLockMode.Unlock,
                         Priority = Definition?.Priority ?? IndexPriority.Normal,
@@ -2886,6 +2911,7 @@ namespace Raven.Server.Documents.Indexes
 
                     stats.Name = Name;
                     stats.SourceType = SourceType;
+                    stats.SearchEngineType = SearchEngineType;
                     stats.Type = Type;
                     stats.LockMode = Definition.LockMode;
                     stats.Priority = Definition.Priority;
@@ -3181,9 +3207,9 @@ namespace Raven.Server.Documents.Indexes
                                         query.Metadata.TimeSeriesIncludes.TimeSeries);
                                 }
 
-                                var retriever = GetQueryResultRetriever(query, queryScope, queryContext.Documents, fieldsToFetch, includeDocumentsCommand, includeCompareExchangeValuesCommand, includeRevisionsCommand);
+                                var retriever = GetQueryResultRetriever(query, queryScope, queryContext.Documents, SearchEngineType, fieldsToFetch, includeDocumentsCommand, includeCompareExchangeValuesCommand, includeRevisionsCommand);
 
-                                IEnumerable<IndexReadOperation.QueryResult> documents;
+                                IEnumerable<IndexReadOperationBase.QueryResult> documents;
 
                                 if (query.Metadata.HasMoreLikeThis)
                                 {
@@ -3229,7 +3255,7 @@ namespace Raven.Server.Documents.Indexes
                                     {
                                         var originalEnumerator = enumerator;
 
-                                        enumerator = new PulsedTransactionEnumerator<IndexReadOperation.QueryResult, QueryResultsIterationState>(queryContext.Documents,
+                                        enumerator = new PulsedTransactionEnumerator<IndexReadOperationBase.QueryResult, QueryResultsIterationState>(queryContext.Documents,
                                             state => originalEnumerator,
                                             new QueryResultsIterationState(queryContext.Documents, DocumentDatabase.Configuration.Databases.PulseReadTransactionLimit));
                                     }
@@ -3458,6 +3484,8 @@ namespace Raven.Server.Documents.Indexes
                 AsyncWaitForIndexing wait = null;
                 (long? DocEtag, long? ReferenceEtag, long? CompareExchangeReferenceEtag)? cutoffEtag = null;
 
+                var stalenessScope = query.Timings?.For(nameof(QueryTimingsScope.Names.Staleness), start: false);
+
                 while (true)
                 {
                     token.ThrowIfCancellationRequested();
@@ -3478,24 +3506,28 @@ namespace Raven.Server.Documents.Indexes
                                 queryContext.OpenReadTransaction();
                             // we have to open read tx for mapResults _after_ we open index tx
 
-                            if (query.WaitForNonStaleResults && cutoffEtag == null)
-                                cutoffEtag = GetCutoffEtag(queryContext);
-
-                            var isStale = IsStale(queryContext, indexContext, cutoffEtag?.DocEtag, cutoffEtag?.ReferenceEtag, cutoffEtag?.CompareExchangeReferenceEtag);
-
-                            if (WillResultBeAcceptable(isStale, query, wait) == false)
+                            bool isStale;
+                            using (stalenessScope?.Start())
                             {
-                                queryContext.CloseTransaction();
-                                Debug.Assert(query.WaitForNonStaleResultsTimeout != null);
+                                if (query.WaitForNonStaleResults && cutoffEtag == null)
+                                    cutoffEtag = GetCutoffEtag(queryContext);
 
-                                if (wait == null)
-                                    wait = new AsyncWaitForIndexing(queryDuration,
-                                        query.WaitForNonStaleResultsTimeout.Value, this);
+                                isStale = IsStale(queryContext, indexContext, cutoffEtag?.DocEtag, cutoffEtag?.ReferenceEtag, cutoffEtag?.CompareExchangeReferenceEtag);
 
-                                marker.ReleaseLock();
+                                if (WillResultBeAcceptable(isStale, query, wait) == false)
+                                {
+                                    queryContext.CloseTransaction();
+                                    Debug.Assert(query.WaitForNonStaleResultsTimeout != null);
 
-                                await wait.WaitForIndexingAsync(frozenAwaiter).ConfigureAwait(false);
-                                continue;
+                                    if (wait == null)
+                                        wait = new AsyncWaitForIndexing(queryDuration,
+                                            query.WaitForNonStaleResultsTimeout.Value, this);
+
+                                    marker.ReleaseLock();
+
+                                    await wait.WaitForIndexingAsync(frozenAwaiter).ConfigureAwait(false);
+                                    continue;
+                                }
                             }
 
                             FillFacetedQueryResult(result, isStale,
@@ -3507,20 +3539,30 @@ namespace Raven.Server.Documents.Indexes
 
                             using (var reader = IndexPersistence.OpenFacetedIndexReader(indexTx.InnerTransaction))
                             {
-                                result.Results = reader.FacetedQuery(facetQuery, queryContext.Documents, GetOrAddSpatialField, token.Token);
-
-                                if (facetQuery.Query.Metadata.HasIncludeOrLoad)
+                                using (var queryScope = query.Timings?.For(nameof(QueryTimingsScope.Names.Query)))
                                 {
-                                    var cmd = new IncludeDocumentsCommand(DocumentDatabase.DocumentsStorage, queryContext.Documents, query.Metadata.Includes, isProjection: true);
-                                    cmd.Gather(result.Results);
+                                    result.Results = reader.FacetedQuery(facetQuery, queryScope, queryContext.Documents, GetOrAddSpatialField, token.Token);
 
-                                    cmd.Fill(result.Includes);
+                                    if (facetQuery.Query.Metadata.HasIncludeOrLoad)
+                                    {
+                                        using (var includesScope = queryScope?.For(nameof(QueryTimingsScope.Names.Includes)))
+                                        {
+                                            var cmd = new IncludeDocumentsCommand(DocumentDatabase.DocumentsStorage, queryContext.Documents, query.Metadata.Includes,
+                                                isProjection: true);
+
+                                            using (includesScope?.For(nameof(QueryTimingsScope.Names.Gather)))
+                                                cmd.Gather(result.Results);
+
+                                            using (includesScope?.For(nameof(QueryTimingsScope.Names.Fill)))
+                                                cmd.Fill(result.Includes);
+                                        }
+                                    }
+
+                                    result.TotalResults = result.Results.Count;
+                                    result.LongTotalResults = result.Results.Count;
+
+                                    return result;
                                 }
-
-                                result.TotalResults = result.Results.Count;
-                                result.LongTotalResults = result.Results.Count;
-
-                                return result;
                             }
                         }
                     }
@@ -3619,7 +3661,8 @@ namespace Raven.Server.Documents.Indexes
                             foreach (var selectField in query.Metadata.SelectFields)
                             {
                                 var suggestField = (SuggestionField)selectField;
-                                using (var reader = IndexPersistence.OpenSuggestionIndexReader(indexTx.InnerTransaction, suggestField.Name))
+                                using (var reader = IndexPersistence.OpenSuggestionIndexReader(indexTx.InnerTransaction,
+                                           suggestField.Name))
                                     result.Results.Add(reader.Suggestions(query, suggestField, queryContext.Documents, token.Token));
                             }
 
@@ -4121,16 +4164,16 @@ namespace Raven.Server.Documents.Indexes
         }
 
         public abstract IQueryResultRetriever GetQueryResultRetriever(
-            IndexQueryServerSide query, QueryTimingsScope queryTimings, DocumentsOperationContext documentsContext, FieldsToFetch fieldsToFetch,
+            IndexQueryServerSide query, QueryTimingsScope queryTimings, DocumentsOperationContext documentsContext, SearchEngineType searchEngineType, FieldsToFetch fieldsToFetch,
             IncludeDocumentsCommand includeDocumentsCommand, IncludeCompareExchangeValuesCommand includeCompareExchangeValuesCommand, IncludeRevisionsCommand includeRevisionsCommand);
 
         public abstract void SaveLastState();
-        
+
         protected void HandleSourceDocumentIncludedInMapOutput()
         {
             if (_alreadyNotifiedAboutIncludingDocumentInOutput || SourceDocumentIncludedInOutput == false || PerformanceHintsConfig.AlertWhenSourceDocumentIncludedInOutput == false)
                 return;
-            
+
             DocumentDatabase.NotificationCenter.Add(PerformanceHint.Create(
                 DocumentDatabase.Name,
                 $"Index '{Name}' is including the origin document in output.",
@@ -4138,10 +4181,10 @@ namespace Raven.Server.Documents.Indexes
                 PerformanceHintType.Indexing,
                 NotificationSeverity.Warning,
                 nameof(Index)));
-            
+
             _alreadyNotifiedAboutIncludingDocumentInOutput = true;
         }
-        
+
         protected void HandleIndexOutputsPerDocument(LazyStringValue documentId, int numberOfOutputs, IndexingStatsScope stats)
         {
             stats.RecordNumberOfProducedOutputs(numberOfOutputs);
@@ -4407,7 +4450,7 @@ namespace Raven.Server.Documents.Indexes
             {
                 var currentManagedAllocations = new Size(GC.GetAllocatedBytesForCurrentThread(), SizeUnit.Bytes);
                 var diff = currentManagedAllocations - _initialManagedAllocations;
-                parameters.Stats.AddAllocatedBytes(diff.GetValue(SizeUnit.Bytes));
+                parameters.Stats.SetAllocatedManagedBytes(diff.GetValue(SizeUnit.Bytes));
 
                 if (diff > Configuration.ManagedAllocationsBatchLimit.Value)
                 {
@@ -4520,7 +4563,7 @@ namespace Raven.Server.Documents.Indexes
 
         public long UpdateThreadAllocations(
             TransactionOperationContext indexingContext,
-            Lazy<IndexWriteOperation> indexWriteOperation,
+            Lazy<IndexWriteOperationBase> indexWriteOperation,
             IndexingStatsScope stats,
             IndexingWorkType workType)
         {
@@ -4559,6 +4602,8 @@ namespace Raven.Server.Documents.Indexes
                         break;
                 }
             }
+            
+            stats?.SetAllocatedUnmanagedBytes(threadAllocations + txAllocations);
 
             var allocatedForProcessing = threadAllocations + indexWriterAllocations +
                                          // we multiple it to take into account additional work
@@ -4607,9 +4652,12 @@ namespace Raven.Server.Documents.Indexes
                     _logger.Info($"{Name} is still waiting for other indexes to complete their batches because there is a {reason} condition in action...");
             }
         }
-        
+
         public void Compact(Action<IOperationProgress> onProgress, CompactionResult result, bool shouldSkipOptimization, CancellationToken token)
         {
+            if (IndexPersistence is CoraxIndexPersistence)
+                throw new NotImplementedInCoraxException($"{nameof(Compact)} is not implemented yet.");
+
             AssertCompactionOrOptimizationIsNotInProgress(Name, nameof(Compact));
 
             result.SizeBeforeCompactionInMb = CalculateIndexStorageSize().GetValue(SizeUnit.Megabytes);
@@ -4635,16 +4683,16 @@ namespace Raven.Server.Documents.Indexes
                 try
                 {
                     var storageEnvironmentOptions = _environment.Options;
-                    
+
                     using (RestartEnvironment(onBeforeEnvironmentDispose: () =>
-                           {
-                               if (shouldSkipOptimization) 
-                                   return;
-                               
-                               result.AddMessage($"Starting data optimization of index '{Name}'.");
-                               onProgress?.Invoke(result.Progress);
-                               OptimizeInternal(token);
-                           }))
+                    {
+                        if (shouldSkipOptimization)
+                            return;
+
+                        result.AddMessage($"Starting data optimization of index '{Name}'.");
+                        onProgress?.Invoke(result.Progress);
+                        OptimizeInternal(token);
+                    }))
                     {
                         DocumentDatabase.IndexStore?.ForTestingPurposes?.IndexCompaction?.Invoke();
 
@@ -4716,8 +4764,11 @@ namespace Raven.Server.Documents.Indexes
 
         public void Optimize(IndexOptimizeResult result, CancellationToken token)
         {
+            if (IndexPersistence is CoraxIndexPersistence)
+                throw new NotImplementedInCoraxException($"{nameof(Optimize)} is not implemented yet.");
+
             AssertCompactionOrOptimizationIsNotInProgress(Name, nameof(Optimize));
-            
+
             try
             {
                 _isCompactionInProgress = true;
@@ -4759,13 +4810,13 @@ namespace Raven.Server.Documents.Indexes
                 throw;
             }
         }
-        
+
         private void AssertCompactionOrOptimizationIsNotInProgress(string name, string operation)
         {
             if (_isCompactionInProgress)
                 throw new InvalidOperationException($"Index '{Name}' cannot be '{operation}' because compaction/optimization is already in progress.");
         }
-        
+
         public IDisposable RestartEnvironment(Action onBeforeEnvironmentDispose = null)
         {
             // shutdown environment
@@ -5081,6 +5132,13 @@ namespace Raven.Server.Documents.Indexes
 
         public int Dump(string path, Action<IOperationProgress> onProgress)
         {
+            if (IndexPersistence is CoraxIndexPersistence)
+            {
+                //todo maciej
+                return 0;
+            }
+
+            LuceneIndexPersistence indexPersistence = (LuceneIndexPersistence)IndexPersistence;
             if (Directory.Exists(path) == false)
                 Directory.CreateDirectory(path);
 
@@ -5089,13 +5147,13 @@ namespace Raven.Server.Documents.Indexes
             {
                 var state = new Indexing.VoronState(tx);
 
-                var files = IndexPersistence.LuceneDirectory.ListAll(state);
+                var files = indexPersistence.LuceneDirectory.ListAll(state);
                 var currentFile = 0;
                 var buffer = new byte[64 * 1024];
                 var sp = Stopwatch.StartNew();
                 foreach (var file in files)
                 {
-                    using (var input = IndexPersistence.LuceneDirectory.OpenInput(file, state))
+                    using (var input = indexPersistence.LuceneDirectory.OpenInput(file, state))
                     using (var output = File.Create(Path.Combine(path, file)))
                     {
                         var currentFileLength = input.Length(state);

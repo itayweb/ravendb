@@ -46,6 +46,15 @@ function getManageServerMenuItem() {
             requiredAccess: "Operator"
         }),
         new leafMenuItem({
+            route: 'admin/settings/serverSettings',
+            moduleId: require("viewmodels/manage/serverSettings"),
+            title: 'Server Settings',
+            nav: true,
+            css: 'icon-server-settings',
+            dynamicHash: appUrl.forServerSettings,
+            requiredAccess: "ClusterAdmin"
+        }),
+        new leafMenuItem({
             route: 'admin/settings/adminJsConsole',
             moduleId: require("viewmodels/manage/adminJsConsole"),
             title: "Admin JS Console",

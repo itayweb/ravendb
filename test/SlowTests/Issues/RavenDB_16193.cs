@@ -4,6 +4,7 @@ using FastTests;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Operations.Indexes;
 using Raven.Server.Documents.Indexes;
+using Raven.Server.Documents.Indexes.Persistence.Lucene;
 using Xunit;
 using Xunit.Abstractions;
 using static Raven.Server.Documents.Indexes.IndexStorage;
@@ -36,7 +37,7 @@ namespace SlowTests.Issues
 
                 Assert.Equal(0, indexStats.EntriesCount);
 
-                Assert.NotNull(indexInstance.IndexPersistence._lastReader);
+                Assert.NotNull((indexInstance.IndexPersistence as LuceneIndexPersistence)?._lastReader);
 
                 using (var session = store.OpenSession())
                 {
@@ -68,13 +69,13 @@ namespace SlowTests.Issues
                 // let's force to clean the reader
                 indexInstance.IndexPersistence.Clean(IndexCleanup.All);
 
-                Assert.Null(indexInstance.IndexPersistence._lastReader);
+                Assert.Null((indexInstance.IndexPersistence as LuceneIndexPersistence)?._lastReader);
 
                 // after the indexing batch has been run we'll get the entries count directly from the storage so no need to recreate the index reader
 
                 Assert.Equal(1, Indexes.WaitForEntriesCount(store, index.IndexName, 1));
 
-                Assert.Null(indexInstance.IndexPersistence._lastReader);
+                Assert.Null((indexInstance.IndexPersistence as LuceneIndexPersistence)?._lastReader);
             }
         }
 

@@ -52,27 +52,34 @@ namespace Raven.Server.Documents.Patch
                 !(args[0].AsObject() is BlittableObjectInstance boi)) 
                 throw new InvalidOperationException("metadataFor(doc) must be called with a single entity argument");
 
-            if (!(boi.Blittable[Constants.Documents.Metadata.Key] is BlittableJsonReaderObject metadata))
-                return JsValue.Null;
-            metadata.Modifications = new DynamicJsonValue
+            var modifiedMetadata = new DynamicJsonValue
             {
                 [Constants.Documents.Metadata.ChangeVector] = boi.ChangeVector,
                 [Constants.Documents.Metadata.Id] = boi.DocumentId,
                 [Constants.Documents.Metadata.LastModified] = boi.LastModified,
             };
 
+            
+            if (boi.Blittable.TryGet(Constants.Documents.Metadata.Key, out BlittableJsonReaderObject metadata))
+            {
+                metadata.Modifications = modifiedMetadata;
+            }
+
             if (boi.IndexScore != null)
-                metadata.Modifications[Constants.Documents.Metadata.IndexScore] = boi.IndexScore.Value;
+                modifiedMetadata[Constants.Documents.Metadata.IndexScore] = boi.IndexScore.Value;
 
             if (boi.Distance != null)
-                metadata.Modifications[Constants.Documents.Metadata.SpatialResult] = boi.Distance.Value.ToJson();
+                modifiedMetadata[Constants.Documents.Metadata.SpatialResult] = boi.Distance.Value.ToJson();
 
             // we cannot dispose the metadata here because the BOI is accessing blittable directly using the .Blittable property
             //using (var old = metadata)
             {
-                metadata = Context.ReadObject(metadata, boi.DocumentId);
+                metadata = metadata == null ? // may be null if we are working on map/redeuce index
+                    Context.ReadObject(modifiedMetadata, boi.DocumentId) : 
+                    Context.ReadObject(metadata, boi.DocumentId);
+                
                 JsValue metadataJs = TranslateToJs(_scriptEngine, Context, metadata);
-                boi.Set(new JsString(Constants.Documents.Metadata.Key), metadataJs);
+                boi.Set(Constants.Documents.Metadata.Key, metadataJs);
 
                 return metadataJs;
             }
@@ -167,7 +174,7 @@ namespace Raven.Server.Documents.Patch
             for (var i = 0; i < values.Length; i++)
                 values[i] = new AttachmentObjectInstance(_scriptEngine, attachments[i]);
 
-            var array = _scriptEngine.Array.Construct(Arguments.Empty);
+            var array = _scriptEngine.Array.Construct(values.Length);
             _scriptEngine.Array.PrototypeObject.Push(array, values);
 
             return array;
@@ -266,9 +273,9 @@ namespace Raven.Server.Documents.Patch
         internal JsValue TranslateToJs(Engine engine, JsonOperationContext context, object o)
         {
             if (o is TimeSeriesRetriever.TimeSeriesStreamingRetrieverResult tsrr)
-            {
-				// we are passing a streaming value to the JS engine, so we need
-				// to materialize all the results
+            { 
+                // we are passing a streaming value to the JS engine, so we need
+                // // to materialize all the results
                 
                 
                 var results = new DynamicJsonArray(tsrr.Stream);
@@ -311,35 +318,35 @@ namespace Raven.Server.Documents.Patch
                 return lng;
             if (o is BlittableJsonReaderArray bjra)
             {
-                var jsArray = engine.Array.Construct(Array.Empty<JsValue>());
-                var args = new JsValue[1];
+                var jsArray = engine.Array.Construct(bjra.Length);
+                var args = new JsValue[bjra.Length];
                 for (var i = 0; i < bjra.Length; i++)
                 {
-                    args[0] = TranslateToJs(engine, context, bjra[i]);
-                    engine.Array.PrototypeObject.Push(jsArray, args);
+                    args[i] = TranslateToJs(engine, context, bjra[i]);
                 }
+                engine.Array.PrototypeObject.Push(jsArray, args);
                 return jsArray;
             }
             if (o is List<object> list)
             {
-                var jsArray = engine.Array.Construct(Array.Empty<JsValue>());
-                var args = new JsValue[1];
+                var jsArray = engine.Array.Construct(list.Count);
+                var args = new JsValue[list.Count];
                 for (var i = 0; i < list.Count; i++)
                 {
-                    args[0] = TranslateToJs(engine, context, list[i]);
-                    engine.Array.PrototypeObject.Push(jsArray, args);
+                    args[i] = TranslateToJs(engine, context, list[i]);
                 }
+                engine.Array.PrototypeObject.Push(jsArray, args);
                 return jsArray;
             }
             if (o is List<Document> docList)
             {
-                var jsArray = engine.Array.Construct(Array.Empty<JsValue>());
-                var args = new JsValue[1];
+                var jsArray = engine.Array.Construct(docList.Count);
+                var args = new JsValue[docList.Count];
                 for (var i = 0; i < docList.Count; i++)
                 {
-                    args[0] = new BlittableObjectInstance(engine, null, Clone(docList[i].Data, context), docList[i]);
-                    engine.Array.PrototypeObject.Push(jsArray, args);
+                    args[i] = new BlittableObjectInstance(engine, null, Clone(docList[i].Data, context), docList[i]);
                 }
+                engine.Array.PrototypeObject.Push(jsArray, args);
                 return jsArray;
             }
             // for admin

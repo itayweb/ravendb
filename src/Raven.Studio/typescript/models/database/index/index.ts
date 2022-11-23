@@ -4,6 +4,8 @@ import collectionsTracker = require("common/helpers/database/collectionsTracker"
 import generalUtils = require("common/generalUtils");
 
 class index {
+    static readonly FieldsToHideOnUi = ["_", "__"];
+    
     static readonly SideBySideIndexPrefix = "ReplacementOf/";
     static readonly AutoIndexPrefix = "Auto/";
     static readonly TestIndexPrefix = "Test/";
@@ -45,6 +47,7 @@ class index {
     typeForUI: KnockoutComputed<string>;
     
     sourceType = ko.observable<Raven.Client.Documents.Indexes.IndexSourceType>();
+    searchEngineType = ko.observable<Raven.Client.Documents.Indexes.SearchEngineType>();
 
     filteredOut = ko.observable<boolean>(false); //UI only property
     badgeClass: KnockoutComputed<string>;
@@ -106,6 +109,7 @@ class index {
         this.collectionNameForReferenceDocuments(dto.PatternReferencesCollectionName);
         this.type(dto.Type);
         this.sourceType(dto.SourceType);
+        this.searchEngineType(dto.SearchEngineType);
         this.state(dto.State);
         this.globalIndexingStatus = globalIndexingStatus;
         this.status(dto.Status); 
@@ -314,6 +318,8 @@ class index {
         
         this.type(incomingData.type());
         this.sourceType(incomingData.sourceType());
+        this.searchEngineType(incomingData.searchEngineType());
+        
         this.priority(incomingData.priority());
         this.state(incomingData.state());
         this.status(incomingData.status());

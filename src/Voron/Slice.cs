@@ -1,4 +1,4 @@
-﻿using Sparrow;
+using Sparrow;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -9,6 +9,7 @@ using Sparrow.Threading;
 
 namespace Voron
 {
+    [DebuggerDisplay("{ToString(),nq}")]
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct Slice
     {
@@ -26,6 +27,14 @@ namespace Voron
         {
             Content = content;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static implicit operator ReadOnlySpan<byte>(Slice x) => new ReadOnlySpan<byte>(x.Content.Ptr, x.Content.Length);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static explicit operator Span<byte>(Slice x) => new Span<byte>(x.Content.Ptr, x.Content.Length);
+
+        public readonly ReadOnlySpan<byte> AsReadOnlySpan() => new ReadOnlySpan<byte>(Content.Ptr, Content.Length);
 
         public bool HasValue => Content.HasValue;
 
@@ -52,6 +61,19 @@ namespace Voron
 
                 return *(Content.Ptr + (sizeof(byte) * index));
             }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set
+            {
+                Debug.Assert(Content.Ptr != null, "Uninitialized slice!");
+
+                if (!Content.HasValue)
+                    throw new InvalidOperationException("Uninitialized slice!");
+
+                if (!Content.IsMutable)
+                    throw new InvalidOperationException("Slice is immutable.");
+
+                *(Content.Ptr + (sizeof(byte) * index)) = value;
+            }
         }
 
         public AllocatedMemoryData CloneToJsonContext(JsonOperationContext context, out Slice slice)
@@ -70,6 +92,11 @@ namespace Voron
         public Slice Skip(ByteStringContext context, int bytesToSkip, ByteStringType type = ByteStringType.Mutable)
         {
             return new Slice(context.Skip(this.Content, bytesToSkip, type));       
+        }
+
+        public void CopyTo(Span<byte> buffer)
+        {
+            AsSpan().CopyTo(buffer);
         }
 
         public void CopyTo(int from, byte* dest, int offset, int count)
@@ -93,9 +120,47 @@ namespace Voron
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains(Slice other)
+        {
+            var length = this.Size - other.Size;
+            if (length < 0)
+                return false;
+
+            // This is the last position with enough space to contain the other slice.             
+            var ptr = Content.Ptr;
+            var end = ptr + length;
+            
+            var otherSpan = new ReadOnlySpan<byte>(other.Content.Ptr, other.Size);
+            byte firstByte = otherSpan[0];
+            while (end >= ptr)
+            {
+                if (*end == firstByte && otherSpan.SequenceCompareTo(new ReadOnlySpan<byte>(end, otherSpan.Length)) == 0)
+                    return true;
+                end--;
+            }
+
+            return false;
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ByteStringContext.InternalScope From(ByteStringContext context, ReadOnlySpan<char> value, out Slice str)
+        {
+            return From(context, value, ByteStringType.Mutable, out str);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ByteStringContext.InternalScope From(ByteStringContext context, string value, out Slice str)
         {
             return From(context, value, ByteStringType.Mutable, out str);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ByteStringContext.InternalScope From(ByteStringContext context, ReadOnlySpan<char> value, ByteStringType type, out Slice str)
+        {
+            var scope = context.From(value, type, out ByteString s);
+            str = new Slice(s);
+            return scope;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -115,13 +180,21 @@ namespace Voron
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ByteStringContext.InternalScope From(ByteStringContext context, byte[] value, out Slice str)
+        public static ByteStringContext.InternalScope From(ByteStringContext context, ReadOnlySpan<char> value, byte endSeparator, ByteStringType type, out Slice str)
+        {
+            var scope = context.From(value, endSeparator, type, out ByteString s);
+            str = new Slice(s);
+            return scope;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ByteStringContext.InternalScope From(ByteStringContext context, ReadOnlySpan<byte> value, out Slice str)
         {
             return From(context, value, ByteStringType.Immutable, out str);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ByteStringContext.InternalScope From(ByteStringContext context, byte[] value, ByteStringType type, out Slice str)
+        public static ByteStringContext.InternalScope From(ByteStringContext context, ReadOnlySpan<byte> value, ByteStringType type, out Slice str)
         {
             var scope = context.From(value, 0, value.Length, type, out ByteString byteString);
             str = new Slice(byteString);
@@ -129,7 +202,7 @@ namespace Voron
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ByteStringContext.InternalScope From(ByteStringContext context, byte[] value, int offset, int count, ByteStringType type, out Slice str)
+        public static ByteStringContext.InternalScope From(ByteStringContext context, ReadOnlySpan<byte> value, int offset, int count, ByteStringType type, out Slice str)
         {
             var scope = context.From(value, offset, count, type, out ByteString byteString);
             str = new Slice(byteString);
@@ -247,6 +320,7 @@ namespace Voron
         }
 
         public readonly Span<byte> AsSpan()
+        
         {
             return new Span<byte>(Content.Ptr, Size);
         }

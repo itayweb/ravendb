@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -187,6 +188,8 @@ namespace Raven.Server.Documents.Handlers
 
                 configuration = JsonDeserializationServer.RevertRevisions(json);
             }
+            
+            HashSet<string> collections = configuration.Collections?.Length > 0 ? new HashSet<string>(configuration.Collections, StringComparer.OrdinalIgnoreCase) : null;
 
             var token = CreateTimeLimitedOperationToken();
             var operationId = ServerStore.Operations.GetNextOperationId();
@@ -195,7 +198,7 @@ namespace Raven.Server.Documents.Handlers
                 Database,
                 $"Revert database '{Database.Name}' to {configuration.Time} UTC.",
                 Operations.Operations.OperationType.DatabaseRevert,
-                onProgress => Database.DocumentsStorage.RevisionsStorage.RevertRevisions(configuration.Time, TimeSpan.FromSeconds(configuration.WindowInSec), onProgress, token),
+                onProgress => Database.DocumentsStorage.RevisionsStorage.RevertRevisions(configuration.Time, TimeSpan.FromSeconds(configuration.WindowInSec), onProgress, collections, token),
                 operationId,
                 token: token);
 

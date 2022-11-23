@@ -348,12 +348,14 @@ namespace Raven.Server.Documents.Indexes
 
         internal static AutoIndexDefinitionBaseServerSide CreateAutoDefinition(AutoIndexDefinition definition, IndexDeploymentMode indexDeployment)
         {
+            int fieldId = 1;
             var mapFields = definition
                 .MapFields
+                .OrderBy(x => x.Key, StringComparer.Ordinal)
                 .Select(x =>
                 {
                     var field = AutoIndexField.Create(x.Key, x.Value);
-
+                    field.Id = fieldId++;
                     Debug.Assert(x.Value.GroupByArrayBehavior == GroupByArrayBehavior.NotApplicable);
 
                     return field;
@@ -377,10 +379,11 @@ namespace Raven.Server.Documents.Indexes
             {
                 var groupByFields = definition
                     .GroupByFields
+                    .OrderBy(x => x.Key, StringComparer.Ordinal)
                     .Select(x =>
                     {
                         var field = AutoIndexField.Create(x.Key, x.Value);
-
+                        field.Id = fieldId++;
                         return field;
                     })
                     .ToArray();
@@ -2119,7 +2122,7 @@ namespace Raven.Server.Documents.Indexes
 
                 try
                 {
-                    IndexingExtensions.GetAnalyzerType(kvp.Key, kvp.Value.Analyzer, _documentDatabase.Name);
+                    LuceneIndexingExtensions.GetAnalyzerType(kvp.Key, kvp.Value.Analyzer, _documentDatabase.Name);
                 }
                 catch (Exception e)
                 {

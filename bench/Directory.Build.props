@@ -2,7 +2,10 @@
   <PropertyGroup>
     <Version></Version>
 
-    <LangVersion>latest</LangVersion>
+    <LangVersion>11</LangVersion>
+    <EnablePreviewFeatures>True</EnablePreviewFeatures>
+    <GenerateRequiresPreviewFeaturesAttribute>True</GenerateRequiresPreviewFeaturesAttribute>
+    
     <DebugType>embedded</DebugType>
     <WarningsAsErrors>true</WarningsAsErrors>
 

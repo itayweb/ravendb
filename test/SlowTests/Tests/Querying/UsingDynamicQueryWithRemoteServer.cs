@@ -13,6 +13,7 @@ using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Operations.Indexes;
 using Raven.Client.Documents.Queries.Highlighting;
+using Tests.Infrastructure;
 using Xunit;
 
 namespace SlowTests.Tests.Querying
@@ -23,10 +24,11 @@ namespace SlowTests.Tests.Querying
         {
         }
 
-        [Fact]
-        public void CanPerformDynamicQueryUsingClientLinqQuery()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanPerformDynamicQueryUsingClientLinqQuery(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog { Title = "one", Category = "Ravens" };
                 var blogTwo = new Blog { Title = "two", Category = "Rhinos" };
@@ -55,10 +57,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void CanPerformDynamicQueryUsingClientLuceneQuery()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.Lucene)]
+        public void CanPerformDynamicQueryUsingClientLuceneQuery(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog { Title = "one", Category = "Ravens" };
                 var blogTwo = new Blog { Title = "two", Category = "Rhinos" };
@@ -89,10 +92,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void CanPerformProjectionUsingClientLinqQuery()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanPerformProjectionUsingClientLinqQuery(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog
                 {
@@ -121,10 +125,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void QueryForASpecificTypeDoesNotBringBackOtherTypes()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void QueryForASpecificTypeDoesNotBringBackOtherTypes(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 using (var s = documentStore.OpenSession())
                 {
@@ -140,10 +145,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void CanPerformLinqOrderByOnNumericField()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanPerformLinqOrderByOnNumericField(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog { SortWeight = 2 };
 
@@ -178,10 +184,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void CanPerformLinqOrderByOnTextField()
+        [RavenTheory(RavenTestCategory.Querying)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanPerformLinqOrderByOnTextField(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog { Title = "aaaaa" };
 
@@ -216,10 +223,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void CanPerformDynamicQueryWithHighlightingUsingClientLuceneQuery()
+        [RavenTheory(RavenTestCategory.Highlighting)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanPerformDynamicQueryWithHighlightingUsingClientLuceneQuery(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog
                 {
@@ -249,7 +257,7 @@ namespace SlowTests.Tests.Querying
 
                 using (var s = documentStore.OpenSession())
                 {
-                    var options = new HighlightingOptions
+                    var highlightingOptions = new HighlightingOptions
                     {
                         PreTags = new[] { "*" },
                         PostTags = new[] { "*" }
@@ -257,8 +265,8 @@ namespace SlowTests.Tests.Querying
 
                     var results =
                         s.Advanced.DocumentQuery<Blog>()
-                            .Highlight("Title", 18, 2, options, out Highlightings titleHighlightings)
-                            .Highlight("Category", 18, 2, options, out Highlightings categoryHighlightings)
+                            .Highlight("Title", 18, 2, highlightingOptions, out Highlightings titleHighlightings)
+                            .Highlight("Category", 18, 2, highlightingOptions, out Highlightings categoryHighlightings)
                             .Search("Title", "target word")
                             .Search("Category", "rhinos")
                             .WaitForNonStaleResults()
@@ -274,10 +282,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void CanPerformDynamicQueryWithHighlighting()
+        [RavenTheory(RavenTestCategory.Highlighting)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanPerformDynamicQueryWithHighlighting(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 var blogOne = new Blog
                 {
@@ -325,10 +334,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void ExecutesQueryWithHighlightingsAgainstSimpleIndex()
+        [RavenTheory(RavenTestCategory.Highlighting)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void ExecutesQueryWithHighlightingsAgainstSimpleIndex(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 const string indexName = "BlogsForHighlightingTests";
                 documentStore.Maintenance.Send(new PutIndexesOperation(new[] {
@@ -389,10 +399,11 @@ namespace SlowTests.Tests.Querying
             }
         }
 
-        [Fact]
-        public void ExecutesQueryWithHighlightingsAndProjections()
+        [RavenTheory(RavenTestCategory.Highlighting)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void ExecutesQueryWithHighlightingsAndProjections(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 const string indexName = "BlogsForHighlightingTests";
                 documentStore.Maintenance.Send(new PutIndexesOperation(new[] {
@@ -414,8 +425,7 @@ namespace SlowTests.Tests.Querying
                 };
                 var blogTwo = new Blog
                 {
-                    Title =
-                                          "Maecenas mauris leo, feugiat sodales facilisis target word, pellentesque, suscipit aliquet turpis.",
+                    Title = "Maecenas mauris leo, feugiat sodales facilisis target word, pellentesque, suscipit aliquet turpis.",
                     Category = "The Rhinos"
                 };
                 var blogThree = new Blog { Title = "Target cras vitae felis arcu word.", Category = "Los Rhinos" };
@@ -446,14 +456,16 @@ namespace SlowTests.Tests.Querying
 
                     Assert.Equal(1, results.Length);
                     Assert.NotEmpty(highlightings.GetFragments(results.First().Category));
+                    Assert.Equal(@"<b style=""background:yellow"">Lorem</b> ipsum dolor", highlightings.GetFragments(results.First().Category).First());
                 }
             }
         }
 
-        [Fact]
-        public void ExecutesQueryWithHighlightingsAgainstMapReduceIndex()
+        [RavenTheory(RavenTestCategory.Highlighting)]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void ExecutesQueryWithHighlightingsAgainstMapReduceIndex(Options options)
         {
-            using (var documentStore = GetDocumentStore())
+            using (var documentStore = GetDocumentStore(options))
             {
                 const string indexName = "BlogsForHighlightingMRTests";
                 documentStore.Maintenance.Send(new PutIndexesOperation(new[] {
@@ -466,10 +478,8 @@ namespace SlowTests.Tests.Querying
                                    select new { Category = g.Key, Title = g.Select(x=>x.Title).Aggregate(string.Concat) }",
                         Fields = new Dictionary<string, IndexFieldOptions>
                         {
-                            {"Title", new IndexFieldOptions { Storage = FieldStorage.Yes
-                                , Indexing = FieldIndexing.Search, TermVector = FieldTermVector.WithPositionsAndOffsets } }, 
-                            {"Category", new IndexFieldOptions { Storage = FieldStorage.Yes } },
-                          
+                            {"Title", new IndexFieldOptions { Storage = FieldStorage.Yes, Indexing = FieldIndexing.Search, TermVector = FieldTermVector.WithPositionsAndOffsets } }, 
+                            {"Category", new IndexFieldOptions { Storage = FieldStorage.Yes, TermVector = FieldTermVector.WithPositionsAndOffsets } },
                         }
                     }}));
 
@@ -480,8 +490,7 @@ namespace SlowTests.Tests.Querying
                 };
                 var blogTwo = new Blog
                 {
-                    Title =
-                                          "Maecenas mauris leo, feugiat sodales facilisis target word, pellentesque, suscipit aliquet turpis.",
+                    Title = "Maecenas mauris leo, feugiat sodales facilisis target word, pellentesque, suscipit aliquet turpis.",
                     Category = "The Rhinos"
                 };
                 var blogThree = new Blog { Title = "Target cras vitae felis arcu word.", Category = "Los Rhinos" };

@@ -3,6 +3,7 @@ using FastTests;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Queries.MoreLikeThis;
 using SlowTests.Core.Utils.Indexes;
+using Tests.Infrastructure;
 using Xunit;
 using Address = SlowTests.Core.Utils.Entities.Address;
 using Post = SlowTests.Core.Utils.Entities.Post;
@@ -17,10 +18,11 @@ namespace SlowTests.Core.Querying
         {
         }
 
-        [Fact]
-        public void CanUseBasicMoreLikeThis()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanUseBasicMoreLikeThis(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
                 var index = new Posts_ByTitleAndContent();
                 index.Execute(store);
@@ -56,12 +58,13 @@ namespace SlowTests.Core.Querying
         }
 
 
-        [Fact]
-        public void CanUseMoreLikeThisWithIncludes()
+        [Theory]
+        [RavenData(SearchEngineMode = RavenSearchEngineMode.All)]
+        public void CanUseMoreLikeThisWithIncludes(Options options)
         {
-            using (var store = GetDocumentStore())
+            using (var store = GetDocumentStore(options))
             {
-                var index = new Users_ByName();
+                var index = new Users_ByName_WithoutBoosting();
                 index.Execute(store);
 
                 using (var session = store.OpenSession())
@@ -74,7 +77,7 @@ namespace SlowTests.Core.Querying
 
                     Indexes.WaitForIndexing(store);
 
-                    var list = session.Query<User, Users_ByName>()
+                    var list = session.Query<User, Users_ByName_WithoutBoosting>()
                         .Include(x => x.AddressId)
                         .MoreLikeThis(f => f.UsingDocument(x => x.Id == "users/1").WithOptions(new MoreLikeThisOptions
                         {
